@@ -55,10 +55,17 @@ pub trait PaymentAccount {
 
 	#[endpoint]
 	fn withdraw(&self, amount: BigUint, token: TokenIdentifier) -> SCResult<()> {
-		// TODO: check for withdrawal lock if active card authorization
-		// TODO: check balance available?
-
 		let caller = self.blockchain().get_caller();
+
+		// if (self.cards().len() > 0) {
+		// 	for card in self.cards().values() {
+		// 		// TODO: check for withdrawal lock if active card authorization
+		// 		// TODO: figure out how to maintain state of previous checks inside multiple async callbacks
+		// 	}
+		// }
+
+		// TODO: If one or more withdrawal locks: ensure balance of assets minus locked amounts does not exceed withdrawal requests (factor in margin of error for slippage)
+		// May require oracle price checks? Do calculation at UI layer first to reduce wastage
 
 		// TODO: allow shared access to payment account
 		require!(caller == self.owner().get(), "Only owner can withdraw assets");

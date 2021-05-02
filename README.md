@@ -102,27 +102,27 @@ Note on multi-currency cards: It may be possible to have a single card use multi
 
 Proposed payment account SC API spec
 ------------------------------------
-[payable “*”]
+[payable("*")]
 deposit()
 
-withdraw(tokenIdentifier, amount)
+withdraw(token, amount)
 
-grantAccess(address)
+grant_access(address)
 
-[payable “*”] // payable to facilitate simultaneous “top-up” and payment as required
-pay(paymentAddress, tokenIdentifier, amount, paymentId)
+[payable("*")] // payable to facilitate simultaneous “top-up” and payment as required
+pay(payment_address, token, amount, payment_id)
 
-authorizeSubscription(authorizedAddress, tokenIdentifier, limit, periodEpochs, subscriptionId)
+authorize_subscription(authorized_address, token, limit, period_epochs, subscription_id)
 
-cancelSubscription(subscriptionId)
+cancel_subscription(subscription_id)
 
-requestSubscriptionPayment(paymentAddress, subscriptionId, amount, paymentId)
+request_subscription_payment(payment_address, subscription_id, amount, payment_id)
 
-authorizeCard(authorizedAddress, tokenIdentifier, limit, cardId)
+authorize_card(authorizedAddress, token, limit, card_id)
 
-cancelCard(cardId)
+cancel_card(card_id)
 
-requestCardPayment(paymentAddress, cardId, amount, paymentId)
+request_card_payment(payment_address, card_id, amount, payment_id)
 
 
 Possible exploit vector

@@ -1,0 +1,22 @@
+<html>
+  <head>
+    <script src="../../qr-builder/dist/bundle.js"></script>
+    <script>
+      MaiarPayments.generatePaymentsQR({
+        paymentId: 'uniqueref',
+        paymentRouterAddress: 'erd...',
+        size: 256,
+        tokenAmount: 50000,
+        tokenIdentifier: 'BUSD-aed415'
+      }).then(imageData => {
+        const img = new Image(256, 256);
+        img.src = imageData;
+        document.getElementById('qr').appendChild(img);
+      })
+    </script>
+  </head>
+  <body>
+    <h1>Test QR Code</h1>
+    <div id="qr"></div>
+  </body>
+</html>

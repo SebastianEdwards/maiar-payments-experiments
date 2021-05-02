@@ -23,6 +23,7 @@ Maiar Exchange - Elrond AMM swap platform for ESDT tokens
 Maiar Forex - stablecoin “forex swap” platform backed by exchange rate oracle data
 
 Phase 0 - Allow user to create payment accounts
+-----------------------------------------------
 
 Inside Maiar the user should be able to deploy a smart contract-backed “payment account” on the network. A many-to-many relationship should exist for these, I.E. one user should be able to open multiple “payment accounts” to achieve any of the following: create a separate payments account for his/her business, spouse, dependants, etc. or simply to help organise their own spending habits more effectively. It should also be possible to share access to “payment accounts” with other Maiar users (for business partners, family, etc.) via their address or by Maiar herotag.
 

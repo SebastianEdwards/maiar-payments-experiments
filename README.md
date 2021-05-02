@@ -33,7 +33,7 @@ Note on locality: for speed and UX purposes “payment accounts” would ideally
 
 Note on transaction royalties: the user being the owner of the smart contract should be entitled to the 30% royalties on the account. This acts as a small gas fee rebate.
 
-Note on upgradability: if this smart contract needs to be upgraded - the user should be prompted to upgrade the “payment account” via code bundled with new versions of Maiar. This could also just happen transparently in the background using a meta-transaction to deploy a new version when the user opens the app if possible. For purposes that will become obvious in “phase 3” the user should not be able to arbitrarily upgrade this code.
+Note on upgradability: if this smart contract needs to be upgraded - the user should be prompted to upgrade the “payment account” via code bundled with new versions of Maiar. This could also just happen transparently in the background using a meta-transaction to deploy a new version when the user opens the app if possible. For purposes that will become obvious in “phase 3” the user should not be able to arbitrarily upgrade this code. Some kind of multisig (end-user and version verifier must agree) contract to handle deploys/upgrades could be used to ensure only known payment account code versions can be deployed, this account would "own" the payment account but could forward all royalties back to the user.
 
 Note on UI: “payment accounts” should be integrated as seamlessly as possible into the Maiar UI and users should not need to be particularly aware that there is a separate smart contract. Similar to how the staking smart contracts do not really need to be fully comprehended.
 

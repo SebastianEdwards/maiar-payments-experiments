@@ -40,7 +40,8 @@ pub trait PaymentAccount {
 	fn share(&self, address: Address) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		require!(caller == self.owner().get(), "Only manager may share access to payment account");
+		let caller_id = self.users().get_user_id(&caller);
+		require!(self.get_role_for_user_id(caller_id) == UserRole::Manager, "Only manager can share access");
 
 		let user_id = self.users().get_or_create_user(&address);
 		self.set_role_for_user_id(user_id, UserRole::SharedAccess);
@@ -86,8 +87,8 @@ pub trait PaymentAccount {
 		// TODO: If one or more withdrawal locks: ensure balance of assets minus locked amounts does not exceed withdrawal requests (factor in margin of error for slippage)
 		// May require oracle price checks? Do calculation at UI layer first to reduce wastage
 
-		let user_id = self.users().get_user_id(&caller);
-		require!(self.get_role_for_user_id(user_id) == UserRole::Manager, "Only manager can withdraw assets");
+		let caller_id = self.users().get_user_id(&caller);
+		require!(self.get_role_for_user_id(caller_id) == UserRole::Manager, "Only manager can withdraw assets");
 
     self.send_tokens(&token, &amount, &caller, &[]);
 

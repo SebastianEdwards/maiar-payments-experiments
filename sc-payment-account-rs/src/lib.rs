@@ -67,8 +67,7 @@ pub trait PaymentAccount {
 
 		// TODO: Exchange tokens as required
 
-		// TODO: Pass payment_id as data
-		self.send_tokens(&token, &amount, &payment_address);
+		self.send_tokens(&token, &amount, &payment_address, &payment_id.as_slice());
 
 		Ok(())
 	}
@@ -90,7 +89,7 @@ pub trait PaymentAccount {
 		let user_id = self.users().get_user_id(&caller);
 		require!(self.get_role_for_user_id(user_id) == UserRole::Manager, "Only manager can withdraw assets");
 
-    self.send_tokens(&token, &amount, &caller);
+    self.send_tokens(&token, &amount, &caller, &[]);
 
     Ok(())
 	}
@@ -138,7 +137,7 @@ pub trait PaymentAccount {
 
 		// TODO: Check that max_amount has not been exceeded this subscription period
 
-		self.send_tokens(&subscription.token, &amount, &payment_address);
+		self.send_tokens(&subscription.token, &amount, &payment_address, &payment_id.as_slice());
 
 		Ok(())
 	}
@@ -185,19 +184,19 @@ pub trait PaymentAccount {
 
 		require!(amount <= card.limit, "Amount requested greater than card limit");
 
-		self.send_tokens(&card.token, &amount, &payment_address);
+		self.send_tokens(&card.token, &amount, &payment_address, payment_id.as_slice());
 
 		Ok(())
 	}
 
 	#[inline]
-	fn send_tokens(&self, token: &TokenIdentifier, amount: &BigUint, destination: &Address) {
+	fn send_tokens(&self, token: &TokenIdentifier, amount: &BigUint, destination: &Address, data: &[u8]) {
 		if amount > &0 {
 			let _ = self.send().direct_esdt_via_transf_exec(
 				destination,
 				token.as_esdt_identifier(),
 				amount,
-				&[],
+				data,
 			);
 		}
 	}

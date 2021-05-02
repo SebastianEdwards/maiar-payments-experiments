@@ -97,33 +97,7 @@ There is still a very small window of time where users could charge their card a
 
 Even with this soft guarantee - sensible card limits should be used so that the scope of failure is limited. A small monthly fee could be imposed on all card-holders and used as a kind of insurance fund.
 
-Note on multi-currency cards: It may be possible to have a single card use multiple currencies depending where it is used, etc. The ability to do this however depends on the card issuing platform - I’ve looked primarily only at Stripe Issuing where currency is fixed to the card at creation time. Whether it is a benefit or not depends on whether the Maiar Forex exchange rates could be lower than native forex of the card issuer - for example Stripe Issuing charge 30c + 1% on forex conversions. A multi-currency approach would have a slightly different API than described below.
-
-
-Proposed payment account SC API spec
-------------------------------------
-[payable("*")]
-deposit()
-
-withdraw(token, amount)
-
-grant_access(address)
-
-[payable("*")] // payable to facilitate simultaneous “top-up” and payment as required
-pay(payment_address, token, amount, payment_id)
-
-authorize_subscription(authorized_address, token, limit, period_epochs, subscription_id)
-
-cancel_subscription(subscription_id)
-
-request_subscription_payment(payment_address, subscription_id, amount, payment_id)
-
-authorize_card(authorizedAddress, token, limit, card_id)
-
-cancel_card(card_id)
-
-request_card_payment(payment_address, card_id, amount, payment_id)
-
+Note on multi-currency cards: It may be possible to have a single card use multiple currencies depending where it is used, etc. The ability to do this however depends on the card issuing platform - I’ve looked primarily only at Stripe Issuing where currency is fixed to the card at creation time. Whether it is a benefit or not depends on whether the Maiar Forex exchange rates could be lower than native forex of the card issuer - for example Stripe Issuing charge 30c + 1% on forex conversions.
 
 Possible exploit vector
 -----------------------

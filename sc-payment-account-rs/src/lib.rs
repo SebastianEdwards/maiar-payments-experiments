@@ -137,6 +137,7 @@ pub trait PaymentAccount {
 		require!(caller == subscription.authorized_address, "Only authorized_address can request payment");
 
 		// TODO: Check that max_amount has not been exceeded this subscription period
+		// TODO: Store map of epochs and amounts for each subscription. Delete all entries older than (current epoch minus period epochs) and sum remaining. Check total + new requested payment less than limit
 
 		self.send_tokens(&subscription.token, &amount, &payment_address, &payment_id.as_slice());
 

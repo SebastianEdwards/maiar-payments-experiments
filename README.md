@@ -24,7 +24,6 @@ Maiar Forex - stablecoin “forex swap” platform backed by exchange rate oracl
 
 Phase 0 - Allow user to create payment accounts
 -----------------------------------------------
-
 Inside Maiar the user should be able to deploy a smart contract-backed “payment account” on the network. A many-to-many relationship should exist for these, I.E. one user should be able to open multiple “payment accounts” to achieve any of the following: create a separate payments account for his/her business, spouse, dependants, etc. or simply to help organise their own spending habits more effectively. It should also be possible to share access to “payment accounts” with other Maiar users (for business partners, family, etc.) via their address or by Maiar herotag.
 
 At the most basic level “deposit” and “withdraw” functions exist on the Smart Contract to add or remove EGLD and ESDT tokens. Payment functions will be described in the various stages below.
@@ -39,7 +38,6 @@ Note on UI: “payment accounts” should be integrated as seamlessly as possibl
 
 Phase 1 - One-off user initiated payments (push)
 ------------------------------------------------
-
 Example flow
 Point of sale system generates QR code and displays on PoS terminal, prints on restaurant bill, or displays on screen as part of ecommerce checkout flow, etc. E.g. a URL of this form is QR coded:
 maiar:payment?tokenIdentifier=BUSD-ade124&amount=50&paymentId=uniqueref&paymentAddress=erd...
@@ -63,7 +61,6 @@ Note on who pays gas fees: by default the user would pay to “pay” in this sc
 
 Phase 2 - Recurring payments / subscriptions (pull authorizations)
 ------------------------------------------------------------------
-
 An increasingly important aspect of any payments infrastructure is the ability for vendors and businesses to charge users in a recurring fashion for access to certain services. A “payments account” could facilitate these types of financial transactions.
 
 Example flow
@@ -86,7 +83,6 @@ Note: a controlling address for the subscription should be stored in the subscri
 
 Phase 3 - Physical / virtual debit cards (pull authorizations with withdrawal locks)
 ------------------------------------------------------------------------------------
-
 The final phase involves integrating this system with something like “Stripe Issuing” to give Maiar users access to physical or virtual (on device) debit cards which can be accepted at millions of retailers worldwide.
 
 Similar to subscriptions, the user gives authorization to a third-party (the card issuer) to directly debit the balance (up to a given limit). The token type will be dependent on the card. IE users can add a USD card which settles transactions in BUSD or a EUR card which settles in a different stablecoin. Unlike subscriptions - this limit is not imposed in a time-dependent manner, rather it is a limit on the max purchase amount. Additional limits may be imposed on the card issuer’s side (daily limits or ATM withdrawal limits, etc)
@@ -106,7 +102,6 @@ Note on multi-currency cards: It may be possible to have a single card use multi
 
 Proposed payment account SC API spec
 ------------------------------------
-
 [payable “*”]
 deposit()
 
@@ -132,17 +127,14 @@ requestCardPayment(paymentAddress, cardId, amount, paymentId)
 
 Possible exploit vector
 -----------------------
-
 Depending on how permissive Maiar Exchange is with the creation of new liquidity pools - a possible exploit could exist whereby payment could be requested in a token which looks like a popular token I.E. BUSD but is actually a similarly named but completely different low-liquidity token. This could trick users into doing expensive swaps where the malicious actor controls the LP. This can be mitigated on the UI-side or also by having a default trusted token whitelist and require users to manually extend this with any new tokens via a function if required (with warnings). If Maiar Exchange has more strict controls over LP creation this may not be required.
 
 Integration future potential
 ----------------------------
-
 Once this backbone is in place; a whole world of integration potential can open up. From cloud-based in-store PoS operators to ecommerce payment method plugins. Shared infrastructure that abstracts the blockchain elements can be built and templates shared with subscription service providers to incorporate into traditional web2 apps, etc.
 
 A large caveat on user privacy
 ------------------------------
-
 With this sort of architecture; it is somewhat important that the “payee account” is at a large enough level of granularity that a minimum of user information is revealed. For example: I may not want to announce to the world I just made a payment at Joe's Cafe and thus broadcast my immediate geographic location. However, if I am making a payment at Joe’s Cafe, and the integration is done through a popular point-of-sale system - any payment would be effectively tumbled with many other payments to many other businesses as long as the payment does not immediately bounce along to Joe’s account but is instead held for some number of hours in a shared account before being paid out to the actual payee.
 
 This convention could be enforced by only allowing payments to be paid to another predefined smart contract type which forces this temporal delay on transaction resolution and requires the integrator to run a “payout” function regularly by providing a mapping of paymentIds to payee accounts. The integrator could be forced to delay this information by requiring that a certain number of hours have passed since each of the payments in any provided mapping have occurred. A penalty could be imposed by requiring that this contract be “staked” to accept payments and slashing the stake for each infraction (requesting payout for a payment too soon).

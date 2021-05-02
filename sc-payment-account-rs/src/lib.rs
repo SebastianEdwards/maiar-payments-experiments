@@ -5,19 +5,17 @@ elrond_wasm::derive_imports!();
 
 #[derive(TopEncode, TopDecode, TypeAbi)]
 pub struct Card<BigUint: BigUintApi> {
-  address: Address,
-  id: BoxedBytes,
+  authorized_address: Address,
   limit: BigUint,
-  token_type: TokenIdentifier,
+  token: TokenIdentifier,
 }
 
 #[derive(TopEncode, TopDecode, TypeAbi)]
 pub struct Subscription<BigUint: BigUintApi> {
-  address: Address,
-  amount: BigUint,
-  epochs: u32,
-  id: BoxedBytes,
-  token_type: TokenIdentifier,
+  authorized_address: Address,
+  max_amount: BigUint,
+  period_epochs: u32,
+  token: TokenIdentifier,
 }
 
 #[elrond_wasm_derive::contract(PaymentAccountImpl)]
@@ -25,7 +23,7 @@ pub trait PaymentAccount {
 	#[init]
 	fn init(&self) {
 		let my_address: Address = self.blockchain().get_caller();
-		self.set_owner(&my_address);
+		self.owner().set(&my_address);
 	}
 
   #[payable("*")]
@@ -34,7 +32,23 @@ pub trait PaymentAccount {
 		let caller = self.blockchain().get_caller();
 
 		// TODO: allow shared access to payment account
-		require!(caller == self.get_owner(), "Only owner can deposit assets");
+		require!(caller == self.owner().get(), "Only owner can deposit assets");
+
+		Ok(())
+	}
+
+	#[payable("*")]
+	#[endpoint]
+	fn pay(&self, payment_address: Address, amount: BigUint, token: TokenIdentifier, payment_id: BoxedBytes) -> SCResult<()> {
+		let caller = self.blockchain().get_caller();
+
+		// TODO: allow shared access to payment account
+		require!(caller == self.owner().get(), "Only owner can authorize payments");
+
+		// TODO: Exchange tokens as required
+
+		// TODO: Pass payment_id as data
+		self.send_tokens(&token, &amount, &payment_address);
 
 		Ok(())
 	}
@@ -47,11 +61,30 @@ pub trait PaymentAccount {
 		let caller = self.blockchain().get_caller();
 
 		// TODO: allow shared access to payment account
-		require!(caller == self.get_owner(), "Only owner can withdraw assets");
+		require!(caller == self.owner().get(), "Only owner can withdraw assets");
 
     self.send_tokens(&token, &amount, &caller);
 
     Ok(())
+	}
+
+	#[endpoint]
+	fn authorize_subscription(&self, authorized_address: Address, max_amount: BigUint, token: TokenIdentifier, period_epochs: u32, subscription_id: BoxedBytes) -> SCResult<()> {
+		let caller = self.blockchain().get_caller();
+
+		// TODO: allow shared access to payment account
+		require!(caller == self.owner().get(), "Only owner can authorize subscriptions");
+
+		let subscription = Subscription::<BigUint> {
+			authorized_address: authorized_address,
+			max_amount: max_amount,
+			period_epochs: period_epochs,
+			token: token,
+		};
+
+		self.subscriptions().insert(subscription_id, subscription);
+
+		Ok(())
 	}
 
 	#[inline]
@@ -68,24 +101,13 @@ pub trait PaymentAccount {
 
 	// storage
 
-	#[storage_set("owner")]
-	fn set_owner(&self, address: &Address);
+	#[view(getOwner)]
+	#[storage_mapper("owner")]
+	fn owner(&self) -> SingleValueMapper<Self::Storage, Address>;
 
-	#[view]
-	#[storage_get("owner")]
-	fn get_owner(&self) -> Address;
+	#[storage_mapper("cards")]
+	fn cards(&self) -> MapMapper<Self::Storage, BoxedBytes, Card<BigUint>>;
 
-	#[storage_set("card")]
-	fn set_card(&self, card_id: &BoxedBytes, subscription_authorization: &Card<BigUint>);
-
-	#[view]
-	#[storage_get("card")]
-	fn get_card(&self, card_id: &BoxedBytes) -> Card<BigUint>;
-
-	#[storage_set("subscription")]
-	fn set_subscription(&self, subscription_id: &BoxedBytes, subscription_authorization: &Subscription<BigUint>);
-
-	#[view]
-	#[storage_get("subscription")]
-	fn get_subscription(&self, subscription_id: &BoxedBytes) -> Subscription<BigUint>;
+	#[storage_mapper("subscriptions")]
+	fn subscriptions(&self) -> MapMapper<Self::Storage, BoxedBytes, Subscription<BigUint>>;
 }

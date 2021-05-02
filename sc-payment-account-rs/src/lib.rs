@@ -87,6 +87,40 @@ pub trait PaymentAccount {
 		Ok(())
 	}
 
+	#[endpoint]
+	fn cancel_subscription(&self, subscription_id: BoxedBytes) -> SCResult<()> {
+		let caller = self.blockchain().get_caller();
+
+		// TODO: allow shared access to payment account
+		require!(caller == self.owner().get(), "Only owner can authorize subscriptions");
+
+		require!(self.subscriptions().contains_key(&subscription_id), "Invalid subscription id");
+
+		self.subscriptions().remove(&subscription_id);
+
+		Ok(())
+	}
+
+	#[endpoint]
+	fn request_subscription_payment(&self, payment_address: Address, subscription_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
+		let caller = self.blockchain().get_caller();
+
+		require!(self.subscriptions().contains_key(&subscription_id), "Invalid subscription id");
+
+		let subscription: Subscription<BigUint> = self
+			.subscriptions()
+			.get(&subscription_id)
+			.unwrap();
+
+		require!(caller == subscription.authorized_address, "Only authorized_address can request payment");
+
+		// TODO: Check that max_amount has not been exceeded this subscription period
+
+		self.send_tokens(&subscription.token, &amount, &payment_address);
+
+		Ok(())
+	}
+
 	#[inline]
 	fn send_tokens(&self, token: &TokenIdentifier, amount: &BigUint, destination: &Address) {
 		if amount > &0 {

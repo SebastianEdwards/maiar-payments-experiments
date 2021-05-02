@@ -142,3 +142,7 @@ This convention could be enforced by only allowing payments to be paid to anothe
 While this may sound burdensome, all of this should be abstracted away from the cafe owner and only be an implementation detail for the point-of-sale company or integrator to keep in mind.
 
 This privacy issue is not a concern in the “card issuer” scenario as any mapping between payments and their final destination happens off-chain. Although, as with any payments card - access to this off-chain information should be strictly limited.
+
+On debit vs credit
+------------------
+Although the initial design operates purely on "debit", I.E. your assets are liquidated to the settlement currency in order to make payments. There is no reason why future upgrades of the payment account smart contract could not enable credit-like transactions. Automatically borrowing the settlement token against your fungible or non-fungible tokens using the most effective (least interest-bearing method), once such lending services exist. The payment account could become configurable with a range of default preferences, perhaps with an option to override these at purchase time (in the case of one-off transactions).

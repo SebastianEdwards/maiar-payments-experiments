@@ -1,0 +1,14 @@
+{
+  "id": "iauth_1CmMk2IyNTgGDVfzFKlCm0gU",
+  "object": "issuing_authorization",
+  "approved": false,
+  "amount": 0,
+  "currency": "usd",
+  "status": "pending",
+  "pending_request": {
+    "amount": 400,
+    "currency": "usd",
+    "merchant_amount": 360,
+    "merchant_currency": "gbp"
+  }
+}

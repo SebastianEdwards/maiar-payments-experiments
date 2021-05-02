@@ -1,59 +1,69 @@
 #![no_std]
 
-pub mod models;
-pub use models::*;
+elrond_wasm::imports!();
+elrond_wasm::derive_imports!();
 
-imports!();
-derive_imports!();
+#[derive(TopEncode, TopDecode, TypeAbi)]
+pub struct Card<BigUint: BigUintApi> {
+  address: Address,
+  id: BoxedBytes,
+  limit: BigUint,
+  token_type: TokenIdentifier,
+}
 
-use elrond_wasm::HexCallDataSerializer;
-
-const ESDT_TRANSFER_STRING: &[u8] = b"ESDTTransfer";
+#[derive(TopEncode, TopDecode, TypeAbi)]
+pub struct Subscription<BigUint: BigUintApi> {
+  address: Address,
+  amount: BigUint,
+  epochs: u32,
+  id: BoxedBytes,
+  token_type: TokenIdentifier,
+}
 
 #[elrond_wasm_derive::contract(PaymentAccountImpl)]
 pub trait PaymentAccount {
 	#[init]
 	fn init(&self) {
-		let my_address: Address = self.get_caller();
+		let my_address: Address = self.blockchain().get_caller();
 		self.set_owner(&my_address);
 	}
 
   #[payable("*")]
 	#[endpoint]
 	fn deposit(&self) -> SCResult<()> {
-		let caller = self.get_caller();
+		let caller = self.blockchain().get_caller();
 
 		// TODO: allow shared access to payment account
-		if caller != self.get_owner() {
-			return sc_error!("only owner can deposit assets");
-		}
+		require!(caller == self.get_owner(), "Only owner can deposit assets");
 
 		Ok(())
 	}
 
 	#[endpoint]
-	fn withdraw(&self, amount: BigUint, esdt_token_name: BoxedBytes) -> SCResult<()> {
+	fn withdraw(&self, amount: BigUint, token: TokenIdentifier) -> SCResult<()> {
 		// TODO: check for withdrawal lock if active card authorization
 		// TODO: check balance available?
 
-		let caller = self.get_caller();
+		let caller = self.blockchain().get_caller();
 
 		// TODO: allow shared access to payment account
-		if caller != self.get_owner() {
-			return sc_error!("only owner can withdraw assets");
-		}
+		require!(caller == self.get_owner(), "Only owner can withdraw assets");
 
-    self.pay_esdt(&esdt_token_name, &amount, &caller);
+    self.send_tokens(&token, &amount, &caller);
 
     Ok(())
 	}
 
-	fn pay_esdt(&self, esdt_token_name: &BoxedBytes, amount: &BigUint, to: &Address) {
-		let mut serializer = HexCallDataSerializer::new(ESDT_TRANSFER_STRING);
-		serializer.push_argument_bytes(esdt_token_name.as_slice());
-		serializer.push_argument_bytes(amount.to_bytes_be().as_slice());
-
-		self.async_call(&to, &BigUint::zero(), serializer.as_slice());
+	#[inline]
+	fn send_tokens(&self, token: &TokenIdentifier, amount: &BigUint, destination: &Address) {
+		if amount > &0 {
+			let _ = self.send().direct_esdt_via_transf_exec(
+				destination,
+				token.as_esdt_identifier(),
+				amount,
+				&[],
+			);
+		}
 	}
 
 	// storage
@@ -66,16 +76,16 @@ pub trait PaymentAccount {
 	fn get_owner(&self) -> Address;
 
 	#[storage_set("card")]
-	fn set_card(&self, cardId: &BoxedBytes, subscription_authorization: &CardAuthorization);
+	fn set_card(&self, card_id: &BoxedBytes, subscription_authorization: &Card<BigUint>);
 
 	#[view]
 	#[storage_get("card")]
-	fn get_card(&self, cardId: &BoxedBytes) -> CardAuthorization;
+	fn get_card(&self, card_id: &BoxedBytes) -> Card<BigUint>;
 
 	#[storage_set("subscription")]
-	fn set_subscription(&self, subscriptionId: &BoxedBytes, subscription_authorization: &SubscriptionAuthorization);
+	fn set_subscription(&self, subscription_id: &BoxedBytes, subscription_authorization: &Subscription<BigUint>);
 
 	#[view]
 	#[storage_get("subscription")]
-	fn get_subscription(&self, subscriptionId: &BoxedBytes) -> SubscriptionAuthorization;
+	fn get_subscription(&self, subscription_id: &BoxedBytes) -> Subscription<BigUint>;
 }

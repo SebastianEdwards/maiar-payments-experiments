@@ -129,15 +129,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "elrond-wasm-node"
-version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f79517660609054ead7ad5aade3e5755b3fe8ee8bc279a55e40452317e5c484"
-dependencies = [
- "elrond-wasm",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -271,9 +262,16 @@ name = "sc_payment_account_rs"
 version = "0.0.0"
 dependencies = [
  "elrond-wasm",
- "elrond-wasm-debug",
  "elrond-wasm-derive",
- "elrond-wasm-node",
+]
+
+[[package]]
+name = "sc_payment_account_rs-abi"
+version = "0.0.0"
+dependencies = [
+ "elrond-wasm",
+ "elrond-wasm-debug",
+ "sc_payment_account_rs",
 ]
 
 [[package]]

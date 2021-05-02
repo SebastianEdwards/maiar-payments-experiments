@@ -18,21 +18,32 @@ pub struct Subscription<BigUint: BigUintApi> {
   token: TokenIdentifier,
 }
 
+#[derive(TopEncode, TopDecode, TypeAbi, Clone, Copy, PartialEq)]
+pub enum UserRole {
+	None,
+	Manager,
+	SharedAccess,
+}
+
 #[elrond_wasm_derive::contract(PaymentAccountImpl)]
 pub trait PaymentAccount {
 	#[init]
-	fn init(&self) {
+	fn init(&self, initial_address: Address) {
 		let my_address: Address = self.blockchain().get_caller();
 		self.owner().set(&my_address);
+
+		let user_id = self.users().get_or_create_user(&initial_address);
+		self.set_role_for_user_id(user_id, UserRole::Manager);
 	}
 
 	#[endpoint]
 	fn share(&self, address: Address) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		require!(caller == self.owner().get(), "Only owner may share access to payment account");
+		require!(caller == self.owner().get(), "Only manager may share access to payment account");
 
-		// TODO: grant address access to account
+		let user_id = self.users().get_or_create_user(&address);
+		self.set_role_for_user_id(user_id, UserRole::SharedAccess);
 
 		Ok(())
 	}
@@ -42,8 +53,7 @@ pub trait PaymentAccount {
 	fn deposit(&self) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		// TODO: allow shared access to payment account
-		require!(caller == self.owner().get(), "Only owner can deposit assets");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can deposit assets");
 
 		Ok(())
 	}
@@ -53,8 +63,7 @@ pub trait PaymentAccount {
 	fn pay(&self, payment_address: Address, amount: BigUint, token: TokenIdentifier, payment_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		// TODO: allow shared access to payment account
-		require!(caller == self.owner().get(), "Only owner can authorize payments");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize payments");
 
 		// TODO: Exchange tokens as required
 
@@ -78,8 +87,8 @@ pub trait PaymentAccount {
 		// TODO: If one or more withdrawal locks: ensure balance of assets minus locked amounts does not exceed withdrawal requests (factor in margin of error for slippage)
 		// May require oracle price checks? Do calculation at UI layer first to reduce wastage
 
-		// TODO: allow shared access to payment account
-		require!(caller == self.owner().get(), "Only owner can withdraw assets");
+		let user_id = self.users().get_user_id(&caller);
+		require!(self.get_role_for_user_id(user_id) == UserRole::Manager, "Only manager can withdraw assets");
 
     self.send_tokens(&token, &amount, &caller);
 
@@ -90,8 +99,7 @@ pub trait PaymentAccount {
 	fn authorize_subscription(&self, authorized_address: Address, max_amount: BigUint, token: TokenIdentifier, period_epochs: u32, subscription_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		// TODO: allow shared access to payment account
-		require!(caller == self.owner().get(), "Only owner can authorize subscriptions");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize subscriptions");
 
 		let subscription = Subscription::<BigUint> {
 			authorized_address: authorized_address,
@@ -109,8 +117,7 @@ pub trait PaymentAccount {
 	fn cancel_subscription(&self, subscription_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		// TODO: allow shared access to payment account
-		require!(caller == self.owner().get(), "Only owner can cancel subscriptions");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can cancel subscriptions");
 
 		require!(self.subscriptions().contains_key(&subscription_id), "Invalid subscription id");
 
@@ -140,8 +147,7 @@ pub trait PaymentAccount {
 	fn authorize_card(&self, authorized_address: Address, limit: BigUint, token: TokenIdentifier, card_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		// TODO: allow shared access to payment account
-		require!(caller == self.owner().get(), "Only owner can authorize cards");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize cards");
 
 		let card = Card::<BigUint> {
 			authorized_address: authorized_address,
@@ -158,8 +164,7 @@ pub trait PaymentAccount {
 	fn cancel_card(&self, card_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		// TODO: allow shared access to payment account
-		require!(caller == self.owner().get(), "Only owner can cancel cards");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can cancel cards");
 
 		require!(self.cards().contains_key(&card_id), "Invalid card id");
 
@@ -202,6 +207,15 @@ pub trait PaymentAccount {
 	#[view(getOwner)]
 	#[storage_mapper("owner")]
 	fn owner(&self) -> SingleValueMapper<Self::Storage, Address>;
+
+	#[storage_mapper("users")]
+	fn users(&self) -> UserMapper<Self::Storage>;
+
+	#[storage_get("user_role")]
+	fn get_role_for_user_id(&self, user_id: usize) -> UserRole;
+
+	#[storage_set("user_role")]
+	fn set_role_for_user_id(&self, user_id: usize, user_role: UserRole);
 
 	#[storage_mapper("cards")]
 	fn cards(&self) -> MapMapper<Self::Storage, BoxedBytes, Card<BigUint>>;

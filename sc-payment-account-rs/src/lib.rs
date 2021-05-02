@@ -26,6 +26,17 @@ pub trait PaymentAccount {
 		self.owner().set(&my_address);
 	}
 
+	#[endpoint]
+	fn share(&self, address: Address) -> SCResult<()> {
+		let caller = self.blockchain().get_caller();
+
+		require!(caller == self.owner().get(), "Only owner may share access to payment account");
+
+		// TODO: grant address access to account
+
+		Ok(())
+	}
+
   #[payable("*")]
 	#[endpoint]
 	fn deposit(&self) -> SCResult<()> {

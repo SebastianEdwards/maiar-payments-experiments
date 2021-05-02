@@ -1,0 +1,3 @@
+[submodule "sc-dex-rs"]
+	path = sc-dex-rs
+	url = git@github.com:ElrondNetwork/sc-dex-rs.git

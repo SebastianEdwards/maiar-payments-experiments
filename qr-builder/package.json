@@ -1,0 +1,9 @@
+{
+  "name": "payments-qr-builder",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "awesome-qr": "^2.1.4-rc.0"
+  }
+}

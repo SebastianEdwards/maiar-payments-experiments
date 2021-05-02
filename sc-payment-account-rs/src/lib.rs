@@ -99,7 +99,7 @@ pub trait PaymentAccount {
 		let caller = self.blockchain().get_caller();
 
 		// TODO: allow shared access to payment account
-		require!(caller == self.owner().get(), "Only owner can authorize subscriptions");
+		require!(caller == self.owner().get(), "Only owner can cancel subscriptions");
 
 		require!(self.subscriptions().contains_key(&subscription_id), "Invalid subscription id");
 
@@ -114,16 +114,62 @@ pub trait PaymentAccount {
 
 		require!(self.subscriptions().contains_key(&subscription_id), "Invalid subscription id");
 
-		let subscription: Subscription<BigUint> = self
-			.subscriptions()
-			.get(&subscription_id)
-			.unwrap();
+		let subscription: Subscription<BigUint> = self.subscriptions().get(&subscription_id).unwrap();
 
 		require!(caller == subscription.authorized_address, "Only authorized_address can request payment");
 
 		// TODO: Check that max_amount has not been exceeded this subscription period
 
 		self.send_tokens(&subscription.token, &amount, &payment_address);
+
+		Ok(())
+	}
+
+	#[endpoint]
+	fn authorize_card(&self, authorized_address: Address, limit: BigUint, token: TokenIdentifier, card_id: BoxedBytes) -> SCResult<()> {
+		let caller = self.blockchain().get_caller();
+
+		// TODO: allow shared access to payment account
+		require!(caller == self.owner().get(), "Only owner can authorize cards");
+
+		let card = Card::<BigUint> {
+			authorized_address: authorized_address,
+			limit: limit,
+			token: token,
+		};
+
+		self.cards().insert(card_id, card);
+
+		Ok(())
+	}
+
+	#[endpoint]
+	fn cancel_card(&self, card_id: BoxedBytes) -> SCResult<()> {
+		let caller = self.blockchain().get_caller();
+
+		// TODO: allow shared access to payment account
+		require!(caller == self.owner().get(), "Only owner can cancel cards");
+
+		require!(self.cards().contains_key(&card_id), "Invalid card id");
+
+		self.cards().remove(&card_id);
+
+		Ok(())
+	}
+
+	#[endpoint]
+	fn request_card_payment(&self, payment_address: Address, card_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
+		let caller = self.blockchain().get_caller();
+
+		require!(self.cards().contains_key(&card_id), "Invalid card id");
+
+		let card: Card<BigUint> = self.cards().get(&card_id).unwrap();
+
+		require!(caller == card.authorized_address, "Only authorized_address can request payment");
+
+		require!(amount <= card.limit, "Amount requested greater than card limit");
+
+		self.send_tokens(&card.token, &amount, &payment_address);
 
 		Ok(())
 	}

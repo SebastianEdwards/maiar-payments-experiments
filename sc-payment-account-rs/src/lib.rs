@@ -95,7 +95,7 @@ pub trait PaymentAccount {
     Ok(())
 	}
 
-	#[endpoint]
+	#[endpoint(authorizeSubscription)]
 	fn authorize_subscription(&self, authorized_address: Address, max_amount: BigUint, token: TokenIdentifier, period_epochs: u32, subscription_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
@@ -113,7 +113,7 @@ pub trait PaymentAccount {
 		Ok(())
 	}
 
-	#[endpoint]
+	#[endpoint(cancelSubscription)]
 	fn cancel_subscription(&self, subscription_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
@@ -126,7 +126,7 @@ pub trait PaymentAccount {
 		Ok(())
 	}
 
-	#[endpoint]
+	#[endpoint(requestSubscriptionPayment)]
 	fn request_subscription_payment(&self, payment_address: Address, subscription_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
@@ -143,7 +143,7 @@ pub trait PaymentAccount {
 		Ok(())
 	}
 
-	#[endpoint]
+	#[endpoint(authorizeCard)]
 	fn authorize_card(&self, authorized_address: Address, limit: BigUint, token: TokenIdentifier, card_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
@@ -160,7 +160,7 @@ pub trait PaymentAccount {
 		Ok(())
 	}
 
-	#[endpoint]
+	#[endpoint(cancelCard)]
 	fn cancel_card(&self, card_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
@@ -173,7 +173,7 @@ pub trait PaymentAccount {
 		Ok(())
 	}
 
-	#[endpoint]
+	#[endpoint(requestCardPayment)]
 	fn request_card_payment(&self, payment_address: Address, card_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 

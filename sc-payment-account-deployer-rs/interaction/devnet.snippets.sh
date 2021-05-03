@@ -25,10 +25,6 @@ checkDeployment() {
 uploadContractCode() {
   echo "STARTING TO PUSH NEW CODE TEMPLATE"
   CODE_HEX="$(xxd -p ../sc-payment-account-rs/output/payment_account.wasm | tr -d '\n')"
-  CODE_HEX1="0x$(gsplit -n1/4 <<<$CODE_HEX)"
-  CODE_HEX2="0x$(gsplit -n2/4 <<<$CODE_HEX)"
-  CODE_HEX3="0x$(gsplit -n3/4 <<<$CODE_HEX)"
-  CODE_HEX4="0x$(gsplit -n4/4 <<<$CODE_HEX)"
 
   erdpy --verbose contract call ${ADDRESS} --recall-nonce \
         --pem=${WALLET_PEM} \
@@ -37,45 +33,30 @@ uploadContractCode() {
         --send
   sleep 6
 
-  echo "SENDING BATCH 1"
-  erdpy --verbose contract call ${ADDRESS} --recall-nonce \
-        --pem=${WALLET_PEM} \
-        --gas-price=1400000000 \
-        --gas-limit=1400000000 \
-        --function=appendCodeTemplate \
-        --arguments $CODE_HEX1 \
-        --send
-  sleep 10
+  for i in 3 4 5 6 7
+  do
+    bytes="$(gsplit -n 1/$i <<<$CODE_HEX | wc -c)"
 
-  echo "SENDING BATCH 2"
-  erdpy --verbose contract call ${ADDRESS} --recall-nonce \
-        --pem=${WALLET_PEM} \
-        --gas-price=1400000000 \
-        --gas-limit=1400000000 \
-        --function=appendCodeTemplate \
-        --arguments $CODE_HEX2 \
-        --send
-  sleep 10
+    if [[ $((bytes % 2)) -eq 0 ]];
+      then break;
+    fi
+  done
 
-  echo "SENDING BATCH 3"
-  erdpy --verbose contract call ${ADDRESS} --recall-nonce \
-        --pem=${WALLET_PEM} \
-        --gas-price=1400000000 \
-        --gas-limit=1400000000 \
-        --function=appendCodeTemplate \
-        --arguments $CODE_HEX3 \
-        --send
-  sleep 10
-
-  echo "SENDING BATCH 4"
-  erdpy --verbose contract call ${ADDRESS} --recall-nonce \
-        --pem=${WALLET_PEM} \
-        --gas-price=1400000000 \
-        --gas-limit=1400000000 \
-        --function=appendCodeTemplate \
-        --arguments $CODE_HEX4 \
-        --send
-  sleep 10
+  a=0
+  while [ $a -lt $i ]
+  do
+    a=`expr $a + 1`
+    chunk="0x$(gsplit -n $a/$i <<<$CODE_HEX)"
+    echo "SENDING BATCH ${a}"
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce \
+          --pem=${WALLET_PEM} \
+          --gas-price=1400000000 \
+          --gas-limit=1400000000 \
+          --function=appendCodeTemplate \
+          --arguments $chunk \
+          --send
+    sleep 10
+  done
 
   echo "ENDING CODE TEMPLATE"
   erdpy --verbose contract call ${ADDRESS} --recall-nonce \

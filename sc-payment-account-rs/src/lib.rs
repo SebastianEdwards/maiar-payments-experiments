@@ -124,7 +124,7 @@ pub trait PaymentAccount {
 	}
 
 	#[endpoint(requestPayment)]
-	fn request_payment(&self, payment_address: Address, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
+	fn request_payment(&self, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
 		require!(self.authorizations().contains_key(&authorization_id), "Invalid authorization id");
@@ -140,7 +140,7 @@ pub trait PaymentAccount {
 			AuthorizedAmount::Unlimited => require!(true, "Always passes")
 		}
 
-		self.send_tokens(&authorization.token, &amount, &payment_address, payment_id.as_slice());
+		self.send_tokens(&authorization.token, &amount, &authorization.authorized_address, payment_id.as_slice());
 
 		if authorization.authorized_amount != AuthorizedAmount::Unlimited || authorization.authorized_debits != AuthorizedDebits::Unlimited {
 			let new_authorized_amount = match authorization.authorized_amount {

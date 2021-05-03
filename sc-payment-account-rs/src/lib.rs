@@ -6,6 +6,7 @@ elrond_wasm::derive_imports!();
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi, Clone, Copy, PartialEq)]
 pub enum AuthorizedAmount<BigUint: BigUintApi> {
 	Fixed(BigUint),
+	FixedEveryPayment(BigUint),
 	FixedEveryXEpochs(BigUint, u32),
 	Unlimited,
 }
@@ -134,6 +135,7 @@ pub trait PaymentAccount {
 
 		match authorization.authorized_amount {
 			AuthorizedAmount::Fixed(ref remaining_amount) => require!(remaining_amount > &amount, "Amount requested greater than authorized amount"),
+			AuthorizedAmount::FixedEveryPayment(ref limit) => require!(limit >= &amount, "Amount requested greater than authorized amount"),
 			AuthorizedAmount::FixedEveryXEpochs(ref _amount_every, _epochs) => require!(false, "Amount requested greater than allowed in current period"), // TODO: handle this
 			AuthorizedAmount::Unlimited => require!(true, "Always passes")
 		}
@@ -143,6 +145,7 @@ pub trait PaymentAccount {
 		if authorization.authorized_amount != AuthorizedAmount::Unlimited || authorization.authorized_debits != AuthorizedDebits::Unlimited {
 			let new_authorized_amount = match authorization.authorized_amount {
 				AuthorizedAmount::Fixed(remaining_amount) => AuthorizedAmount::Fixed(remaining_amount - amount),
+				AuthorizedAmount::FixedEveryPayment(limit) => AuthorizedAmount::FixedEveryPayment(limit),
 				AuthorizedAmount::FixedEveryXEpochs(amount_every, epochs) => AuthorizedAmount::FixedEveryXEpochs(amount_every, epochs),
 				AuthorizedAmount::Unlimited => AuthorizedAmount::Unlimited
 			};

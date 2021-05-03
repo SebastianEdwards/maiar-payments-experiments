@@ -6,7 +6,7 @@ elrond_wasm::derive_imports!();
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi, Clone, Copy, PartialEq)]
 pub enum AuthorizedAmount<BigUint: BigUintApi> {
 	Fixed(BigUint),
-	FixedEveryEpochs(BigUint, u32),
+	FixedEveryXEpochs(BigUint, u32),
 	Unlimited,
 }
 
@@ -133,14 +133,38 @@ pub trait PaymentAccount {
 		require!(caller == authorization.authorized_address, "Only authorized_address can request payment");
 
 		match authorization.authorized_amount {
-			AuthorizedAmount::Fixed(remaining_amount) => require!(remaining_amount > amount, "Amount requested greater than authorized amount"),
-			AuthorizedAmount::FixedEveryEpochs(_amount_every, _epoch_period) => require!(false, "Amount requested great than allowed in current period"), // TODO: handle this
+			AuthorizedAmount::Fixed(ref remaining_amount) => require!(remaining_amount > &amount, "Amount requested greater than authorized amount"),
+			AuthorizedAmount::FixedEveryXEpochs(ref _amount_every, _epochs) => require!(false, "Amount requested greater than allowed in current period"), // TODO: handle this
 			AuthorizedAmount::Unlimited => require!(true, "Always passes")
 		}
 
 		self.send_tokens(&authorization.token, &amount, &payment_address, payment_id.as_slice());
 
-		// TODO: Update and remove authorizations as needed (reached amount limit or debit limit)
+		if authorization.authorized_amount != AuthorizedAmount::Unlimited || authorization.authorized_debits != AuthorizedDebits::Unlimited {
+			let new_authorized_amount = match authorization.authorized_amount {
+				AuthorizedAmount::Fixed(remaining_amount) => AuthorizedAmount::Fixed(remaining_amount - amount),
+				AuthorizedAmount::FixedEveryXEpochs(amount_every, epochs) => AuthorizedAmount::FixedEveryXEpochs(amount_every, epochs),
+				AuthorizedAmount::Unlimited => AuthorizedAmount::Unlimited
+			};
+
+			let new_authorized_debits = match authorization.authorized_debits {
+				AuthorizedDebits::Fixed(remaining) => AuthorizedDebits::Fixed(remaining - 1),
+				AuthorizedDebits::Unlimited => AuthorizedDebits::Unlimited
+			};
+
+			if new_authorized_amount == AuthorizedAmount::Fixed(BigUint::zero()) || new_authorized_debits == AuthorizedDebits::Fixed(0) {
+				self.authorizations().remove(&authorization_id);
+			} else {
+				let new_authorization = PaymentAuthorization::<BigUint> {
+					authorized_address: authorization.authorized_address,
+					authorized_amount: new_authorized_amount,
+					authorized_debits: new_authorized_debits,
+					token: authorization.token,
+				};
+
+				self.authorizations().insert(authorization_id, new_authorization);
+			}
+		}
 
 		Ok(())
 	}

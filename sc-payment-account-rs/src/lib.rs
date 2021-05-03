@@ -3,18 +3,24 @@
 elrond_wasm::imports!();
 elrond_wasm::derive_imports!();
 
-#[derive(TopEncode, TopDecode, TypeAbi)]
-pub struct Card<BigUint: BigUintApi> {
-  authorized_address: Address,
-  limit: BigUint,
-  token: TokenIdentifier,
+#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi, Clone, Copy, PartialEq)]
+pub enum AuthorizedAmount<BigUint: BigUintApi> {
+	Fixed(BigUint),
+	FixedEveryEpochs(BigUint, u32),
+	Unlimited,
+}
+
+#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi, Clone, Copy, PartialEq)]
+pub enum AuthorizedDebits {
+	Fixed(u32),
+	Unlimited,
 }
 
 #[derive(TopEncode, TopDecode, TypeAbi)]
-pub struct Subscription<BigUint: BigUintApi> {
+pub struct PaymentAuthorization<BigUint: BigUintApi> {
   authorized_address: Address,
-  max_amount: BigUint,
-  period_epochs: u32,
+  authorized_amount: AuthorizedAmount<BigUint>,
+	authorized_debits: AuthorizedDebits,
   token: TokenIdentifier,
 }
 
@@ -59,20 +65,6 @@ pub trait PaymentAccount {
 		Ok(())
 	}
 
-	#[payable("*")]
-	#[endpoint]
-	fn pay(&self, payment_address: Address, amount: BigUint, token: TokenIdentifier, payment_id: BoxedBytes) -> SCResult<()> {
-		let caller = self.blockchain().get_caller();
-
-		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize payments");
-
-		// TODO: Exchange tokens as required
-
-		self.send_tokens(&token, &amount, &payment_address, &payment_id.as_slice());
-
-		Ok(())
-	}
-
 	#[endpoint]
 	fn withdraw(&self, amount: BigUint, token: TokenIdentifier) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
@@ -95,98 +87,81 @@ pub trait PaymentAccount {
     Ok(())
 	}
 
-	#[endpoint(authorizeSubscription)]
-	fn authorize_subscription(&self, authorized_address: Address, max_amount: BigUint, token: TokenIdentifier, period_epochs: u32, subscription_id: BoxedBytes) -> SCResult<()> {
+	#[endpoint]
+	fn authorize(&self, authorization_id: BoxedBytes, authorized_address: Address, authorized_amount: AuthorizedAmount<BigUint>, authorized_debits: AuthorizedDebits, token: TokenIdentifier) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize subscriptions");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize payments");
 
-		let subscription = Subscription::<BigUint> {
+		let authorization = PaymentAuthorization::<BigUint> {
 			authorized_address: authorized_address,
-			max_amount: max_amount,
-			period_epochs: period_epochs,
+			authorized_amount: authorized_amount,
+			authorized_debits: authorized_debits,
 			token: token,
 		};
 
-		self.subscriptions().insert(subscription_id, subscription);
+		self.authorizations().insert(authorization_id, authorization);
 
 		Ok(())
 	}
 
-	#[endpoint(cancelSubscription)]
-	fn cancel_subscription(&self, subscription_id: BoxedBytes) -> SCResult<()> {
+	#[payable("*")]
+	#[endpoint(authorizeAndPay)]
+	fn authorize_and_pay(&self, payment_address: Address, payment_id: BoxedBytes, amount: BigUint, token: TokenIdentifier) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		require!(self.users().get_user_id(&caller) != 0, "Only user can cancel subscriptions");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize payments");
 
-		require!(self.subscriptions().contains_key(&subscription_id), "Invalid subscription id");
-
-		self.subscriptions().remove(&subscription_id);
-
-		Ok(())
-	}
-
-	#[endpoint(requestSubscriptionPayment)]
-	fn request_subscription_payment(&self, payment_address: Address, subscription_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
-		let caller = self.blockchain().get_caller();
-
-		require!(self.subscriptions().contains_key(&subscription_id), "Invalid subscription id");
-
-		let subscription: Subscription<BigUint> = self.subscriptions().get(&subscription_id).unwrap();
-
-		require!(caller == subscription.authorized_address, "Only authorized_address can request payment");
-
-		// TODO: Check that max_amount has not been exceeded this subscription period
-		// TODO: Store map of epochs and amounts for each subscription. Delete all entries older than (current epoch minus period epochs) and sum remaining. Check total + new requested payment less than limit
-
-		self.send_tokens(&subscription.token, &amount, &payment_address, &payment_id.as_slice());
-
-		Ok(())
-	}
-
-	#[endpoint(authorizeCard)]
-	fn authorize_card(&self, authorized_address: Address, limit: BigUint, token: TokenIdentifier, card_id: BoxedBytes) -> SCResult<()> {
-		let caller = self.blockchain().get_caller();
-
-		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize cards");
-
-		let card = Card::<BigUint> {
-			authorized_address: authorized_address,
-			limit: limit,
+		let authorization = PaymentAuthorization::<BigUint> {
+			authorized_address: payment_address,
+			authorized_amount: AuthorizedAmount::Fixed(amount),
+			authorized_debits: AuthorizedDebits::Fixed(1),
 			token: token,
 		};
 
-		self.cards().insert(card_id, card);
+		self.authorizations().insert(payment_id, authorization);
+
+		// TODO: Do payment and remove authorization immediately
 
 		Ok(())
 	}
 
-	#[endpoint(cancelCard)]
-	fn cancel_card(&self, card_id: BoxedBytes) -> SCResult<()> {
+	#[endpoint(cancelAuthorization)]
+	fn cancel_authorization(&self, authorization_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		require!(self.users().get_user_id(&caller) != 0, "Only user can cancel cards");
+		// TODO: allow payee to also cancel authorization
 
-		require!(self.cards().contains_key(&card_id), "Invalid card id");
+		require!(self.users().get_user_id(&caller) != 0, "Only user can cancel authorization");
 
-		self.cards().remove(&card_id);
+		require!(self.authorizations().contains_key(&authorization_id), "Invalid authorization id");
+
+		// TODO: check for withdrawal lock on authorization
+
+		self.authorizations().remove(&authorization_id);
 
 		Ok(())
 	}
 
-	#[endpoint(requestCardPayment)]
-	fn request_card_payment(&self, payment_address: Address, card_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
+	#[endpoint(requestPayment)]
+	fn request_payment(&self, payment_address: Address, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		require!(self.cards().contains_key(&card_id), "Invalid card id");
+		require!(self.authorizations().contains_key(&authorization_id), "Invalid authorization id");
 
-		let card: Card<BigUint> = self.cards().get(&card_id).unwrap();
+		let authorization: PaymentAuthorization<BigUint> = self.authorizations().get(&authorization_id).unwrap();
 
-		require!(caller == card.authorized_address, "Only authorized_address can request payment");
+		require!(caller == authorization.authorized_address, "Only authorized_address can request payment");
 
-		require!(amount <= card.limit, "Amount requested greater than card limit");
+		match authorization.authorized_amount {
+			AuthorizedAmount::Fixed(remaining_amount) => require!(remaining_amount > amount, "Amount requested greater than authorized amount"),
+			AuthorizedAmount::FixedEveryEpochs(_amount_every, _epoch_period) => require!(false, "Amount requested great than allowed in current period"), // TODO: handle this
+			AuthorizedAmount::Unlimited => require!(true, "Always passes")
+		}
 
-		self.send_tokens(&card.token, &amount, &payment_address, payment_id.as_slice());
+		self.send_tokens(&authorization.token, &amount, &payment_address, payment_id.as_slice());
+
+		// TODO: Update and remove authorizations as needed (reached amount limit or debit limit)
 
 		Ok(())
 	}
@@ -218,9 +193,6 @@ pub trait PaymentAccount {
 	#[storage_set("user_role")]
 	fn set_role_for_user_id(&self, user_id: usize, user_role: UserRole);
 
-	#[storage_mapper("cards")]
-	fn cards(&self) -> MapMapper<Self::Storage, BoxedBytes, Card<BigUint>>;
-
-	#[storage_mapper("subscriptions")]
-	fn subscriptions(&self) -> MapMapper<Self::Storage, BoxedBytes, Subscription<BigUint>>;
+	#[storage_mapper("authorizations")]
+	fn authorizations(&self) -> MapMapper<Self::Storage, BoxedBytes, PaymentAuthorization<BigUint>>;
 }

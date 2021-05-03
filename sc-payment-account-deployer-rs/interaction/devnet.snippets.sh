@@ -1,7 +1,7 @@
 ALICE="${PROJECT}/../testnet/wallets/users/alice.pem"
 ADDRESS=$(erdpy data load --key=address-devnet)
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction-devnet)
-DEPLOY_ARGUMENTS="0x0139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e1"
+DEPLOY_ARGUMENTS="0x$(cat ../sc-payment-account-rs/output/payment_account.wasm | hexdump -ve '/1 "%02x"')"
 DEPLOY_GAS="80000000"
 
 deploy() {

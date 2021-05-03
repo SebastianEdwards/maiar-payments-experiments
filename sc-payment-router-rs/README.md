@@ -1,3 +1,5 @@
-Acts as a light-weight tumbler/delay process in the transaction loop from POS integration to final payee.
+Collects payments from payment accounts where it is authorized.
 
-Added to help mitigate payer privacy issues.
+Can "fast-lock" withdrawals for authorized payment accounts.
+
+Acts as a light-weight tumbler/delay process in the transaction loop from POS integration to final payee.

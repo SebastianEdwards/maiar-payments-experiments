@@ -234,6 +234,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
+name = "payment_account"
+version = "0.0.0"
+dependencies = [
+ "elrond-wasm",
+ "elrond-wasm-derive",
+]
+
+[[package]]
+name = "payment_account-abi"
+version = "0.0.0"
+dependencies = [
+ "elrond-wasm",
+ "elrond-wasm-debug",
+ "payment_account",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -256,23 +273,6 @@ name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
-
-[[package]]
-name = "sc_payment_account_rs"
-version = "0.0.0"
-dependencies = [
- "elrond-wasm",
- "elrond-wasm-derive",
-]
-
-[[package]]
-name = "sc_payment_account_rs-abi"
-version = "0.0.0"
-dependencies = [
- "elrond-wasm",
- "elrond-wasm-debug",
- "sc_payment_account_rs",
-]
 
 [[package]]
 name = "serde"

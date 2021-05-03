@@ -1,5 +1,5 @@
 [package]
-name = "sc_payment_account_rs"
+name = "payment_account"
 version = "0.0.0"
 authors = [ "you",]
 edition = "2018"

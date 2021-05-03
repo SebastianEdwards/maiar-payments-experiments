@@ -267,7 +267,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
-name = "sc_payment_account_rs"
+name = "payment_account"
 version = "0.0.0"
 dependencies = [
  "elrond-wasm",

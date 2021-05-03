@@ -1,4 +1,4 @@
-use sc_payment_account_rs::*;
+use payment_account::*;
 use elrond_wasm_debug::*;
 
 fn main() {

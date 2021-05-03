@@ -1,5 +1,5 @@
 [package]
-name = "sc_payment_account_rs-abi"
+name = "payment_account-abi"
 version = "0.0.0"
 authors = [ "you",]
 edition = "2018"
@@ -7,7 +7,7 @@ publish = false
 
 [dev-dependencies]
 
-[dependencies.sc_payment_account_rs]
+[dependencies.payment_account]
 path = ".."
 
 [dependencies.elrond-wasm]

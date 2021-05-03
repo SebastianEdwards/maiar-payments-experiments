@@ -1,5 +1,5 @@
 [package]
-name = "sc_payment_account_rs-wasm"
+name = "payment_account-wasm"
 version = "0.0.0"
 authors = [ "you",]
 edition = "2018"
@@ -20,7 +20,7 @@ lto = true
 debug = false
 panic = "abort"
 
-[dependencies.sc_payment_account_rs]
+[dependencies.payment_account]
 features = [ "wasm-output-mode",]
 default-features = false
 path = ".."

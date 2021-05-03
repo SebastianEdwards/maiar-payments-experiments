@@ -121,6 +121,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
+name = "payment_account"
+version = "0.0.0"
+dependencies = [
+ "elrond-wasm",
+ "elrond-wasm-derive",
+ "elrond-wasm-node",
+]
+
+[[package]]
+name = "payment_account-wasm"
+version = "0.0.0"
+dependencies = [
+ "elrond-wasm-output",
+ "payment_account",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -136,23 +153,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d0b9745dc2debf507c8422de05d7226cc1f0644216dfdfead988f9b1ab32a7"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "sc_payment_account_rs"
-version = "0.0.0"
-dependencies = [
- "elrond-wasm",
- "elrond-wasm-derive",
- "elrond-wasm-node",
-]
-
-[[package]]
-name = "sc_payment_account_rs-wasm"
-version = "0.0.0"
-dependencies = [
- "elrond-wasm-output",
- "sc_payment_account_rs",
 ]
 
 [[package]]

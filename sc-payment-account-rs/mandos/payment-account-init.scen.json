@@ -23,7 +23,7 @@
       "txId": "deploy",
       "tx": {
         "from": "address:my_address",
-        "contractCode": "file:../output/sc_payment_account_rs.wasm",
+        "contractCode": "file:../output/payment_account.wasm",
         "value": "0",
         "arguments": [
           "address:my_address"
@@ -51,7 +51,7 @@
           "storage": {
             "''owner": "address:my_address"
           },
-          "code": "file:../output/sc_payment_account_rs.wasm"
+          "code": "file:../output/payment_account.wasm"
         }
       }
     }

@@ -1,5 +1,5 @@
 
 #![no_std]
 
-pub use sc_payment_account_rs::*;
+pub use payment_account::*;
 pub use elrond_wasm_output::*;

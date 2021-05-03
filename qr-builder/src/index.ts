@@ -1,26 +1,43 @@
 import { AwesomeQR } from 'awesome-qr'
 
 import { MAIAR_LOGO } from './maiar-logo'
-import { buildPaymentUrl } from './url-builder'
 
 window['MaiarPayments'] = {
   generatePaymentsQR: async ({
-    paymentId,
-    paymentRouterAddress,
+    authorizationId,
+    categoryHint,
+    description,
+    iconUrl,
     size = 256,
+    paymentProcessorAddress,
+    protocol = 'maiar:',
     tokenAmount,
     tokenIdentifier
   }: {
-    paymentId: string
-    paymentRouterAddress: string
+    authorizationId: string
+    categoryHint?: string
+    description?: string
+    iconUrl?: string
+    paymentProcessorAddress: string
+    protocol?: string
     size: number
     tokenAmount: number
     tokenIdentifier: string
   }) => {
+    const params = {
+      address: paymentProcessorAddress,
+      amount: tokenAmount,
+      category: categoryHint,
+      description,
+      iconUrl,
+      id: authorizationId,
+      token: tokenIdentifier
+    }
+
     return new AwesomeQR({
-      text: buildPaymentUrl({ paymentId, paymentRouterAddress, tokenAmount, tokenIdentifier }),
+      logoImage: MAIAR_LOGO,
       size,
-      logoImage: MAIAR_LOGO
+      text: protocol + 'payment?' + Object.keys(params).filter(k => params[k]).map(k => k + '=' + encodeURIComponent(params[k])).join('&')
     }).draw()
   }
 }

@@ -3,8 +3,11 @@
     <script src="../../qr-builder/dist/bundle.js"></script>
     <script>
       MaiarPayments.generatePaymentsQR({
-        paymentId: 'uniqueref',
-        paymentRouterAddress: 'erd...',
+        authorizationId: 'uniqueref',
+        categoryHint: 'Education',
+        description: "Seb's monthly newsletter",
+        paymentProcessorAddress: 'erd...',
+        protocol: 'https://localhost:5000/',
         size: 256,
         tokenAmount: 50000,
         tokenIdentifier: 'BUSD-aed415'

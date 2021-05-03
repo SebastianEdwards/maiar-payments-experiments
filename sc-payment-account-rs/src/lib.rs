@@ -105,32 +105,11 @@ pub trait PaymentAccount {
 		Ok(())
 	}
 
-	#[payable("*")]
-	#[endpoint(authorizeAndPay)]
-	fn authorize_and_pay(&self, payment_address: Address, payment_id: BoxedBytes, amount: BigUint, token: TokenIdentifier) -> SCResult<()> {
-		let caller = self.blockchain().get_caller();
-
-		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize payments");
-
-		let authorization = PaymentAuthorization::<BigUint> {
-			authorized_address: payment_address,
-			authorized_amount: AuthorizedAmount::Fixed(amount),
-			authorized_debits: AuthorizedDebits::Fixed(1),
-			token: token,
-		};
-
-		self.authorizations().insert(payment_id, authorization);
-
-		// TODO: Do payment and remove authorization immediately
-
-		Ok(())
-	}
-
 	#[endpoint(cancelAuthorization)]
 	fn cancel_authorization(&self, authorization_id: BoxedBytes) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		// TODO: allow payee to also cancel authorization
+		// TODO: allow authorized_address to also cancel authorization
 
 		require!(self.users().get_user_id(&caller) != 0, "Only user can cancel authorization");
 

@@ -32,6 +32,19 @@ pub trait PaymentProcessor {
 		self.owner().set(&my_address);
 	}
 
+	#[endpoint(getLockedAmount)]
+	fn get_locked_amount(&self, authorization_id: BoxedBytes) -> SCResult<BigUint> {
+		let withdrawal_lock_key = WithdrawalLockKey {
+			authorization_id: authorization_id,
+			payment_account_address: self.blockchain().get_caller(),
+		};
+
+		match self.withdrawal_locks().get(&withdrawal_lock_key) {
+			Some(locked_amount) => Ok(locked_amount),
+			None => Ok(BigUint::zero())
+		}
+	}
+
 	#[endpoint(requestPayment)]
 	fn request_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<AsyncCall<BigUint>> {
 		only_owner!(self, "Only owner may request payment");

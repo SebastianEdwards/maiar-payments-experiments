@@ -59,15 +59,19 @@ pub trait PaymentAccount {
 		let user_id = self.users().get_or_create_user(&address);
 		self.set_role_for_user_id(user_id, UserRole::SharedAccess);
 
+		self.user_added_event(&caller, &address);
+
 		Ok(())
 	}
 
   #[payable("*")]
 	#[endpoint]
-	fn deposit(&self) -> SCResult<()> {
+	fn deposit(&self, #[payment] amount: BigUint, #[payment_token] token: TokenIdentifier) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
 		require!(self.users().get_user_id(&caller) != 0, "Only user can deposit assets");
+
+		self.deposit_made_event(&caller, &token, &amount);
 
 		Ok(())
 	}
@@ -203,6 +207,14 @@ pub trait PaymentAccount {
 			);
 		}
 	}
+
+	// events
+
+	#[event("deposit_made")]
+	fn deposit_made_event(&self, #[indexed] depositor: &Address, #[indexed] token: &TokenIdentifier, amount: &BigUint);
+
+	#[event("user_added")]
+	fn user_added_event(&self, #[indexed] manager: &Address, new_user: &Address);
 
 	// storage
 

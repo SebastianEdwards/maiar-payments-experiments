@@ -1,3 +1,9 @@
+A mock version of an app-based interface for interacting with payments system.
+
+Built using web technologies and erdjs.
+
+
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

@@ -1,19 +1,19 @@
-WALLET_PEM="${PROJECT}/../testnet/wallets/users/alice.pem"
+WALLET_PEM="${PROJECT}/../testnet/wallets/users/carol.pem"
 ADDRESS=$(erdpy data load --key=address-devnet)
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction-devnet)
+TEMPLATE_ADDRESS=$(erdpy data parse --file ../sc-payment-account-template-rs/erdpy.data-storage.json --expression "data['*']['address-devnet']")
 
-deploy() {
-  erdpy --verbose contract deploy --project=${PROJECT} --recall-nonce --pem=${WALLET_PEM} \
+deployOne() {
+  ARGUMENTS="0x$(erdpy wallet bech32 --decode $TEMPLATE_ADDRESS)"
+
+  erdpy contract deploy --project=${PROJECT} --recall-nonce --pem=${WALLET_PEM} \
         --gas-limit=80000000 --outfile="deploy-devnet.interaction.json" \
-        --send --metadata-payable || return
+        --arguments=${ARGUMENTS} --send --metadata-payable || return
 
-  TRANSACTION=$(erdpy data parse --file="deploy-devnet.interaction.json" --expression="data['emitted_tx']['hash']")
   ADDRESS=$(erdpy data parse --file="deploy-devnet.interaction.json" --expression="data['emitted_tx']['address']")
 
   erdpy data store --key=address-devnet --value=${ADDRESS}
-  erdpy data store --key=deployTransaction-devnet --value=${TRANSACTION}
 
-  echo ""
   echo "Smart contract address: ${ADDRESS}"
 }
 
@@ -22,57 +22,72 @@ checkDeployment() {
   erdpy account get --address=$ADDRESS --omit-fields="['code']"
 }
 
-uploadContractCode() {
-  echo "STARTING TO PUSH NEW CODE TEMPLATE"
-  CODE_HEX="$(xxd -p ../sc-payment-account-rs/output/payment_account.wasm | tr -d '\n')"
-
-  erdpy --verbose contract call ${ADDRESS} --recall-nonce \
-        --pem=${WALLET_PEM} \
-        --gas-limit=1400000000 \
-        --function=startCodeTemplate \
-        --send
-  sleep 6
-
-  for i in 3 4 5 6 7
-  do
-    bytes="$(gsplit -n 1/$i <<<$CODE_HEX | wc -c)"
-
-    if [[ $((bytes % 2)) -eq 0 ]];
-      then break;
-    fi
-  done
-
-  a=0
-  while [ $a -lt $i ]
-  do
-    a=`expr $a + 1`
-    chunk="0x$(gsplit -n $a/$i <<<$CODE_HEX)"
-    echo "SENDING BATCH ${a}"
-    erdpy --verbose contract call ${ADDRESS} --recall-nonce \
-          --pem=${WALLET_PEM} \
-          --gas-price=1400000000 \
-          --gas-limit=1400000000 \
-          --function=appendCodeTemplate \
-          --arguments $chunk \
-          --send
-    sleep 10
-  done
-
-  echo "ENDING CODE TEMPLATE"
-  erdpy --verbose contract call ${ADDRESS} --recall-nonce \
-        --pem=${WALLET_PEM} \
-        --gas-price=1400000000 \
-        --gas-limit=1400000000 \
-        --function=endCodeTemplate \
-        --send
-  sleep 6
-}
-
-getCode() {
-  erdpy --verbose contract query ${ADDRESS} --function="getCodeTemplate"
-}
-
 createPaymentAccount() {
   erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${WALLET_PEM} \
-        --gas-limit=37000000 --function="createPaymentAccount" --send
+        --gas-limit=260000000 --function="createPaymentAccount" --send
 }
+
+# prepareAddresses() {
+#   i=0
+#   while [ $i -lt 256 ]
+#   do
+#     i=225
+#     DEPLOY_PEM="${PROJECT}/../deploy-wallets/${i}.pem"
+#     DEPLOY_ADDRESS="$(erdpy wallet pem-address $DEPLOY_PEM)"
+
+#     erdpy tx new --recall-nonce --pem=${DEPLOY_PEM} \
+#           --gas-limit=0 --receiver=${DEPLOY_ADDRESS} \
+#           --value 0 --send
+
+#     i=`expr $i + 1`
+#   done
+# }
+
+# sendGas() {
+#   i=0
+#   while [ $i -lt 256 ]
+#   do
+#     DEPLOY_PEM="${PROJECT}/../deploy-wallets/${i}.pem"
+#     DEPLOY_ADDRESS="$(erdpy wallet pem-address $DEPLOY_PEM)"
+
+#     erdpy tx new --recall-nonce --pem=${WALLET_PEM} \
+#           --gas-limit=80000000 --receiver=${DEPLOY_ADDRESS} \
+#           --value 20816810000000000 --send
+
+#     i=`expr $i + 1`
+#   done
+# }
+
+# getBalances() {
+#   i=0
+#   while [ $i -lt 256 ]
+#   do
+#     DEPLOY_PEM="${PROJECT}/../deploy-wallets/${i}.pem"
+#     DEPLOY_ADDRESS="$(erdpy wallet pem-address $DEPLOY_PEM)"
+
+#     BALANCE="$(erdpy account get --balance --address $DEPLOY_ADDRESS)"
+#     echo "Shard ${i}, address ${DEPLOY_ADDRESS} has balance: ${BALANCE}"
+
+#     i=`expr $i + 1`
+#   done
+# }
+
+# deploy() {
+#   i=0
+#   while [ $i -lt 256 ]
+#   do
+#     DEPLOY_PEM="${PROJECT}/../deploy-wallets/${i}.pem"
+#     DEPLOY_ADDRESS="$(erdpy wallet pem-address $DEPLOY_PEM)"
+
+#     erdpy contract deploy --project=${PROJECT} --recall-nonce --pem=${DEPLOY_PEM} \
+#           --gas-limit=80000000 --outfile="deploy-devnet.interaction.json" \
+#           --send --metadata-payable || return
+
+#     ADDRESS=$(erdpy data parse --file="deploy-devnet.interaction.json" --expression="data['emitted_tx']['address']")
+
+#     erdpy data store --key=address-devnet-${i} --value=${ADDRESS}
+
+#     echo "Shard ${i} smart contract address: ${ADDRESS}"
+#     i=`expr $i + 1`
+#   done
+# }

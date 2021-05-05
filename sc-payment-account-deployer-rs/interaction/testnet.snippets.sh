@@ -1,22 +1,20 @@
-ALICE="${PROJECT}/../testnet/wallets/users/alice.pem"
+WALLET_PEM="${PROJECT}/../testnet/wallets/users/mike.pem"
 ADDRESS=$(erdpy data load --key=address-testnet)
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction-testnet)
-DEPLOY_ARGUMENTS="0x0139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e1"
-DEPLOY_GAS="80000000"
+TEMPLATE_ADDRESS=$(erdpy data parse --file ../sc-payment-account-template-rs/erdpy.data-storage.json --expression "data['*']['address-testnet']")
 PROXY="https://testnet-gateway.elrond.com"
 
-deploy() {
-  erdpy --verbose contract deploy --project=${PROJECT} --recall-nonce --pem=${ALICE} \
-        --gas-limit=${DEPLOY_GAS} --arguments ${DEPLOY_ARGUMENTS} \
-        --outfile="deploy-testnet.interaction.json" --send --proxy=${PROXY} --chain=T || return
+deployOne() {
+  ARGUMENTS="0x$(erdpy wallet bech32 --decode $TEMPLATE_ADDRESS)"
 
-  TRANSACTION=$(erdpy data parse --file="deploy-testnet.interaction.json" --expression="data['emitted_tx']['hash']")
+  erdpy contract deploy --project=${PROJECT} --recall-nonce --pem=${WALLET_PEM} \
+        --gas-limit=80000000 --outfile="deploy-testnet.interaction.json" \
+        --arguments=${ARGUMENTS} --send --metadata-payable --proxy=${PROXY} --chain=T || return
+
   ADDRESS=$(erdpy data parse --file="deploy-testnet.interaction.json" --expression="data['emitted_tx']['address']")
 
   erdpy data store --key=address-testnet --value=${ADDRESS}
-  erdpy data store --key=deployTransaction-testnet --value=${TRANSACTION}
 
-  echo ""
   echo "Smart contract address: ${ADDRESS}"
 }
 
@@ -26,6 +24,6 @@ checkDeployment() {
 }
 
 createPaymentAccount() {
-  erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=1400000000 \
+  erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${WALLET_PEM} --gas-limit=260000000 \
         --function="createPaymentAccount" --send --proxy=${PROXY} --chain=T
 }

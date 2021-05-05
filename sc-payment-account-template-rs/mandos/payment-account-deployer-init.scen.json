@@ -1,0 +1,59 @@
+{
+  "name": "payment account deployment test",
+  "steps": [
+    {
+      "step": "setState",
+      "accounts": {
+        "address:my_address": {
+          "nonce": "0",
+          "balance": "1,000,000",
+          "storage": {}
+        }
+      },
+      "newAddresses": [
+        {
+          "creatorAddress": "address:my_address",
+          "creatorNonce": "0",
+          "newAddress": "address:the_payment_account_template_contract"
+        }
+      ]
+    },
+    {
+      "step": "scDeploy",
+      "txId": "deploy",
+      "tx": {
+        "from": "address:my_address",
+        "contractCode": "file:../output/payment_account_template.wasm",
+        "value": "0",
+        "arguments": [
+          "address:my_address"
+        ],
+        "gasLimit": "1,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "status": "0",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "step": "checkState",
+      "accounts": {
+        "address:my_address": {
+          "nonce": "1",
+          "balance": "1,000,000",
+          "storage": {}
+        },
+        "address:the_payment_account_template_contract": {
+          "nonce": "0",
+          "balance": "0",
+          "storage": {
+            "''owner": "address:my_address"
+          },
+          "code": "file:../output/payment_account_template.wasm"
+        }
+      }
+    }
+  ]
+}

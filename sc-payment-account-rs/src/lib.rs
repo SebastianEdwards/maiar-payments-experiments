@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(non_snake_case)]
 
 elrond_wasm::imports!();
 elrond_wasm::derive_imports!();
@@ -30,6 +31,11 @@ pub enum UserRole {
 	None,
 	Manager,
 	SharedAccess,
+}
+
+#[elrond_wasm_derive::callable(PaymentProcessorProxy)]
+pub trait PaymentProcessor {
+	fn getLockedAmount(&self, authorization_id: BoxedBytes) -> ContractCall<BigUint, BigUint>;
 }
 
 #[elrond_wasm_derive::contract(PaymentAccountImpl)]
@@ -107,20 +113,34 @@ pub trait PaymentAccount {
 	}
 
 	#[endpoint(cancelAuthorization)]
-	fn cancel_authorization(&self, authorization_id: BoxedBytes) -> SCResult<()> {
-		let caller = self.blockchain().get_caller();
+	fn cancel_authorization(&self, authorization_id: BoxedBytes) -> SCResult<AsyncCall<BigUint>> {
+		match self.authorizations().get(&authorization_id) {
+			Some(authorization) => {
+				let caller = self.blockchain().get_caller();
 
-		// TODO: allow authorized_address to also cancel authorization
+				require!(self.users().get_user_id(&caller) != 0 || caller == authorization.authorized_address, "Only user or authorized address can cancel authorization");
 
-		require!(self.users().get_user_id(&caller) != 0, "Only user can cancel authorization");
+				Ok(contract_call!(self, authorization.authorized_address, PaymentProcessorProxy)
+					.getLockedAmount(authorization_id.clone())
+					.async_call()
+					.with_callback(self.callbacks().remove_authorization(authorization_id)))
+			},
+			None => sc_error!("Invalid authorization id")
+		}
+	}
 
-		require!(self.authorizations().contains_key(&authorization_id), "Invalid authorization id");
+	#[callback]
+	fn remove_authorization(&self, authorization_id: BoxedBytes, #[call_result] result: AsyncCallResult<BigUint>) -> SCResult<()> {
+		match result {
+			AsyncCallResult::Ok(amount) => {
+				require!(amount == BigUint::zero(), "Authorization has active withdrawal lock");
 
-		// TODO: check for withdrawal lock on authorization
+				self.authorizations().remove(&authorization_id);
 
-		self.authorizations().remove(&authorization_id);
-
-		Ok(())
+				Ok(())
+			},
+			AsyncCallResult::Err(message) => Err(message.err_msg.into())
+		}
 	}
 
 	#[endpoint(requestPayment)]

@@ -21,7 +21,7 @@ const PAYMENT_HOLD_PERIOD: u64 = 10 * 60 * 24;
 
 #[elrond_wasm_derive::callable(PaymentAccountProxy)]
 pub trait PaymentAccount {
-	fn requestPayment(&self, authorization_id: BoxedBytes, amount: BigUint) -> ContractCall<BigUint, ()>;
+	fn requestPayment(&self, authorization_id: BoxedBytes, amount: BigUint) -> ContractCall<BigUint, TokenIdentifier>;
 }
 
 #[elrond_wasm_derive::contract(PaymentProcessorImpl)]
@@ -33,7 +33,7 @@ pub trait PaymentProcessor {
 	}
 
 	#[endpoint(requestPayment)]
-	fn request_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<()> {
+	fn request_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<AsyncCall<BigUint>> {
 		only_owner!(self, "Only owner may request payment");
 
 		let withdrawal_lock_key = WithdrawalLockKey {
@@ -45,23 +45,35 @@ pub trait PaymentProcessor {
 
 		self.withdrawal_locks().insert(withdrawal_lock_key, amount.clone());
 
-		let payment_account = contract_call!(self, payment_account_address, PaymentAccountProxy);
+		Ok(contract_call!(self, payment_account_address.clone(), PaymentAccountProxy)
+			.requestPayment(authorization_id.clone(), amount.clone())
+			.async_call()
+			.with_callback(self.callbacks().settle_payment(payment_account_address, authorization_id, amount, payment_id)))
+	}
 
-		payment_account
-			.requestPayment(authorization_id, amount.clone())
-			.execute_on_dest_context(self.blockchain().get_gas_left(), self.send());
+	#[callback]
+	fn settle_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes, #[call_result] result: AsyncCallResult<TokenIdentifier>) -> SCResult<()> {
+		match result {
+			AsyncCallResult::Ok(token) => {
+				let withdrawal_lock_key = WithdrawalLockKey {
+					authorization_id: authorization_id,
+					payment_account_address: payment_account_address,
+				};
 
-		// TODO: Remove withdrawal lock after callback success
+				self.withdrawal_locks().remove(&withdrawal_lock_key);
 
-		let payment = Payment::<BigUint> {
-			amount: amount.clone(),
-			held_until: self.blockchain().get_block_nonce() + PAYMENT_HOLD_PERIOD,
-			token: TokenIdentifier::egld(), // TODO: Placeholder... get this from payment account authorization or pass in and cross-check in remote call?
-		};
+				let payment = Payment::<BigUint> {
+					amount: amount,
+					held_until: self.blockchain().get_block_nonce() + PAYMENT_HOLD_PERIOD,
+					token: token,
+				};
 
-		self.payments().insert(payment_id, payment);
+				self.payments().insert(payment_id, payment);
 
-		Ok(())
+				Ok(())
+			},
+			AsyncCallResult::Err(message) => Err(message.err_msg.into())
+		}
 	}
 
 	// storage

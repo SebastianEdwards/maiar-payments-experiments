@@ -124,7 +124,7 @@ pub trait PaymentAccount {
 	}
 
 	#[endpoint(requestPayment)]
-	fn request_payment(&self, authorization_id: BoxedBytes, amount: BigUint) -> SCResult<()> {
+	fn request_payment(&self, authorization_id: BoxedBytes, amount: BigUint) -> SCResult<TokenIdentifier> {
 		let caller = self.blockchain().get_caller();
 
 		require!(self.authorizations().contains_key(&authorization_id), "Invalid authorization id");
@@ -162,14 +162,14 @@ pub trait PaymentAccount {
 					authorized_address: authorization.authorized_address,
 					authorized_amount: new_authorized_amount,
 					authorized_debits: new_authorized_debits,
-					token: authorization.token,
+					token: authorization.token.clone(),
 				};
 
 				self.authorizations().insert(authorization_id, new_authorization);
 			}
 		}
 
-		Ok(())
+		Ok(authorization.token)
 	}
 
 	#[inline]

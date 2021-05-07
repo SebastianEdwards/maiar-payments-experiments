@@ -45,9 +45,55 @@ pub trait PaymentProcessor {
 		}
 	}
 
+	#[endpoint]
+	fn payout(&self, payout_address: Address, token: TokenIdentifier, amount: BigUint) -> SCResult<()> {
+		only_owner!(self, "Only owner may payout");
+
+		require!(amount > BigUint::zero(), "Payout amount must be greater than zero");
+
+		let mut total_payoutable = match self.payable_amounts().get(&token) { Some(payoutable) => payoutable, None => BigUint::zero() };
+
+		if total_payoutable >= amount {
+			self.payable_amounts().insert(token.clone(), &total_payoutable - &amount);
+
+			let _ = self.send().direct_esdt_via_transf_exec(
+				&payout_address,
+				token.as_esdt_identifier(),
+				&amount,
+				&[],
+			);
+
+			Ok(())
+		} else {
+			match self.held_amounts().get(&token) {
+				Some(mut held_amounts) => {
+					let current_epoch = self.blockchain().get_block_nonce();
+
+					while match held_amounts.front() { Some((held_until, _)) => held_until >= current_epoch, None => false } {
+						total_payoutable += held_amounts.pop_front().unwrap().1;
+					}
+
+					self.payable_amounts().insert(token.clone(), &total_payoutable - &amount);
+
+					let _ = self.send().direct_esdt_via_transf_exec(
+						&payout_address,
+						token.as_esdt_identifier(),
+						&amount,
+						&[],
+					);
+
+					Ok(())
+				},
+				None => sc_error!("No payments awaiting payout for token")
+			}
+		}
+	}
+
 	#[endpoint(requestPayment)]
-	fn request_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes) -> SCResult<AsyncCall<BigUint>> {
+	fn request_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint) -> SCResult<AsyncCall<BigUint>> {
 		only_owner!(self, "Only owner may request payment");
+
+		require!(amount > BigUint::zero(), "Requested amount must be greater than zero");
 
 		let withdrawal_lock_key = WithdrawalLockKey {
 			authorization_id: authorization_id.clone(),
@@ -61,11 +107,11 @@ pub trait PaymentProcessor {
 		Ok(contract_call!(self, payment_account_address.clone(), PaymentAccountProxy)
 			.requestPayment(authorization_id.clone(), amount.clone())
 			.async_call()
-			.with_callback(self.callbacks().settle_payment(payment_account_address, authorization_id, amount, payment_id)))
+			.with_callback(self.callbacks().settle_payment(payment_account_address, authorization_id, amount)))
 	}
 
 	#[callback]
-	fn settle_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint, payment_id: BoxedBytes, #[call_result] result: AsyncCallResult<TokenIdentifier>) -> SCResult<()> {
+	fn settle_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint, #[call_result] result: AsyncCallResult<TokenIdentifier>) -> SCResult<()> {
 		match result {
 			AsyncCallResult::Ok(token) => {
 				let withdrawal_lock_key = WithdrawalLockKey {
@@ -75,13 +121,7 @@ pub trait PaymentProcessor {
 
 				self.withdrawal_locks().remove(&withdrawal_lock_key);
 
-				let payment = Payment::<BigUint> {
-					amount: amount,
-					held_until: self.blockchain().get_block_nonce() + PAYMENT_HOLD_PERIOD,
-					token: token,
-				};
-
-				self.payments().insert(payment_id, payment);
+				self.held_amounts().entry(token).or_default().update( |held_amounts_list| held_amounts_list.push_back((self.blockchain().get_block_nonce() + PAYMENT_HOLD_PERIOD, amount)) );
 
 				Ok(())
 			},
@@ -95,8 +135,11 @@ pub trait PaymentProcessor {
 	#[storage_mapper("owner")]
 	fn owner(&self) -> SingleValueMapper<Self::Storage, Address>;
 
-	#[storage_mapper("payments")]
-	fn payments(&self) -> MapMapper<Self::Storage, BoxedBytes, Payment<BigUint>>;
+	#[storage_mapper("held_amounts")]
+	fn held_amounts(&self) -> MapStorageMapper<Self::Storage, TokenIdentifier, LinkedListMapper<Self::Storage, (u64, BigUint)>>;
+
+	#[storage_mapper("payable_amounts")]
+	fn payable_amounts(&self) -> MapMapper<Self::Storage, TokenIdentifier, BigUint>;
 
 	#[storage_mapper("withdrawal_locks")]
 	fn withdrawal_locks(&self) -> MapMapper<Self::Storage, WithdrawalLockKey, BigUint>;

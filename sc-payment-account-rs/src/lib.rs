@@ -93,7 +93,7 @@ pub trait PaymentAccount {
 		let caller_id = self.users().get_user_id(&caller);
 		require!(self.get_role_for_user_id(caller_id) == UserRole::Manager, "Only manager can withdraw assets");
 
-    self.send_tokens(&token, &amount, &caller, &[]);
+    self.send_tokens(&token, &amount, &caller);
 
     Ok(())
 	}
@@ -185,7 +185,11 @@ pub trait PaymentAccount {
 			AuthorizedAmount::Unlimited => require!(true, "Always passes")
 		}
 
-		self.send_tokens(&authorization.token, &amount, &authorization.authorized_address, authorization_id.as_slice());
+		if &self.get_balance(&authorization.token) >= &amount {
+			self.send_tokens(&authorization.token, &amount, &authorization.authorized_address);
+		} else {
+			// TODO: Actual conversion of tokens into settlement currency as required or fail
+		}
 
 		if authorization.authorized_amount != AuthorizedAmount::Unlimited || authorization.authorized_debits != AuthorizedDebits::Unlimited {
 			let new_authorized_amount = match authorization.authorized_amount {
@@ -218,13 +222,22 @@ pub trait PaymentAccount {
 	}
 
 	#[inline]
-	fn send_tokens(&self, token: &TokenIdentifier, amount: &BigUint, destination: &Address, data: &[u8]) {
+	fn get_balance(&self, token: &TokenIdentifier) -> BigUint {
+		if token == &TokenIdentifier::egld() {
+			self.blockchain().get_balance(&self.blockchain().get_sc_address())
+		} else {
+			self.blockchain().get_esdt_balance(&self.blockchain().get_sc_address(), token.as_esdt_identifier(), 0)
+		}
+	}
+
+	#[inline]
+	fn send_tokens(&self, token: &TokenIdentifier, amount: &BigUint, destination: &Address) {
 		if amount > &0 {
 			let _ = self.send().direct_esdt_via_transf_exec(
 				destination,
 				token.as_esdt_identifier(),
 				amount,
-				data,
+				&[],
 			);
 		}
 	}

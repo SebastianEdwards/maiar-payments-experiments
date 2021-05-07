@@ -8,7 +8,7 @@ elrond_wasm::derive_imports!();
 pub enum AuthorizedAmount<BigUint: BigUintApi> {
 	Fixed(BigUint),
 	FixedEveryPayment(BigUint),
-	FixedEveryXEpochs(BigUint, u32),
+	FixedEveryXEpochs(BigUint, u64),
 	Unlimited,
 }
 
@@ -160,7 +160,23 @@ pub trait PaymentAccount {
 		match authorization.authorized_amount {
 			AuthorizedAmount::Fixed(ref remaining_amount) => require!(remaining_amount > &amount, "Amount requested greater than authorized amount"),
 			AuthorizedAmount::FixedEveryPayment(ref limit) => require!(limit >= &amount, "Amount requested greater than authorized amount"),
-			AuthorizedAmount::FixedEveryXEpochs(ref _amount_every, _epochs) => require!(false, "Amount requested greater than allowed in current period"), // TODO: handle this
+			AuthorizedAmount::FixedEveryXEpochs(ref amount_every, epochs) => match self.every_x_epochs_payments().get(&authorization_id) {
+				Some(mut previous_epoch_amount_list) => require!({
+					let current_epoch = self.blockchain().get_block_epoch();
+					let start_of_period = current_epoch - epochs;
+
+					while match previous_epoch_amount_list.front() { Some((epoch, _)) => epoch < start_of_period, None => false } {
+						previous_epoch_amount_list.pop_front();
+					}
+
+					let previous_total = previous_epoch_amount_list.iter().fold(BigUint::zero(), |acc, (_, amount)| acc + amount);
+
+					previous_epoch_amount_list.push_back((current_epoch, amount.clone()));
+
+					amount_every - &previous_total >= amount
+				}, "Amount requested greater than authorized amount"),
+				None => require!(amount_every >= &amount, "Amount requested greater than authorized amount")
+			},
 			AuthorizedAmount::Unlimited => require!(true, "Always passes")
 		}
 
@@ -233,4 +249,7 @@ pub trait PaymentAccount {
 
 	#[storage_mapper("authorizations")]
 	fn authorizations(&self) -> MapMapper<Self::Storage, BoxedBytes, PaymentAuthorization<BigUint>>;
+
+	#[storage_mapper("every_x_epochs_payments")]
+	fn every_x_epochs_payments(&self) -> MapStorageMapper<Self::Storage, BoxedBytes, LinkedListMapper<Self::Storage, (u64, BigUint)>>;
 }

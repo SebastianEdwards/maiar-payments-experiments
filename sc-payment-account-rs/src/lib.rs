@@ -35,7 +35,7 @@ pub enum UserRole {
 
 #[elrond_wasm_derive::callable(PaymentProcessorProxy)]
 pub trait PaymentProcessor {
-	fn getLockedAmount(&self, authorization_id: BoxedBytes) -> ContractCall<BigUint, BigUint>;
+	fn getUnsettledAmount(&self, authorization_id: BoxedBytes) -> ContractCall<BigUint, BigUint>;
 }
 
 #[elrond_wasm_derive::contract(PaymentAccountImpl)]
@@ -125,7 +125,7 @@ pub trait PaymentAccount {
 				require!(self.users().get_user_id(&caller) != 0 || caller == authorization.authorized_address, "Only user or authorized address can cancel authorization");
 
 				Ok(contract_call!(self, authorization.authorized_address, PaymentProcessorProxy)
-					.getLockedAmount(authorization_id.clone())
+					.getUnsettledAmount(authorization_id.clone())
 					.async_call()
 					.with_callback(self.callbacks().remove_authorization(authorization_id)))
 			},
@@ -137,7 +137,7 @@ pub trait PaymentAccount {
 	fn remove_authorization(&self, authorization_id: BoxedBytes, #[call_result] result: AsyncCallResult<BigUint>) -> SCResult<()> {
 		match result {
 			AsyncCallResult::Ok(amount) => {
-				require!(amount == BigUint::zero(), "Authorization has active withdrawal lock");
+				require!(amount == BigUint::zero(), "Authorization has outstanding unsettled amount");
 
 				self.authorizations().remove(&authorization_id);
 

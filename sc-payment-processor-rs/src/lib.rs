@@ -32,29 +32,16 @@ pub trait PaymentProcessor {
 		self.owner().set(&my_address);
 	}
 
-	#[endpoint(getLockedAmount)]
-	fn get_locked_amount(&self, authorization_id: BoxedBytes) -> SCResult<BigUint> {
-		let withdrawal_lock_key = WithdrawalLockKey {
-			authorization_id: authorization_id,
-			payment_account_address: self.blockchain().get_caller(),
-		};
-
-		match self.withdrawal_locks().get(&withdrawal_lock_key) {
-			Some(locked_amount) => Ok(locked_amount),
-			None => Ok(BigUint::zero())
-		}
-	}
-
 	#[endpoint]
 	fn payout(&self, payout_address: Address, token: TokenIdentifier, amount: BigUint) -> SCResult<()> {
 		only_owner!(self, "Only owner may payout");
 
 		require!(amount > BigUint::zero(), "Payout amount must be greater than zero");
 
-		let mut total_payoutable = match self.payable_amounts().get(&token) { Some(payoutable) => payoutable, None => BigUint::zero() };
+		let mut total_payable = self.payable_amount(&token).get();
 
-		if total_payoutable >= amount {
-			self.payable_amounts().insert(token.clone(), &total_payoutable - &amount);
+		if total_payable >= amount {
+			self.payable_amount(&token).set(&(&total_payable - &amount));
 
 			let _ = self.send().direct_esdt_via_transf_exec(
 				&payout_address,
@@ -65,27 +52,26 @@ pub trait PaymentProcessor {
 
 			Ok(())
 		} else {
-			match self.held_amounts().get(&token) {
-				Some(mut held_amounts) => {
-					let current_epoch = self.blockchain().get_block_nonce();
+			let mut held_amounts = self.held_amounts(&token);
 
-					while match held_amounts.front() { Some((held_until, _)) => held_until >= current_epoch, None => false } {
-						total_payoutable += held_amounts.pop_front().unwrap().1;
-					}
+			require!(held_amounts.len() > 0, "No payments awaiting payout for token");
 
-					self.payable_amounts().insert(token.clone(), &total_payoutable - &amount);
+			let current_epoch = self.blockchain().get_block_nonce();
 
-					let _ = self.send().direct_esdt_via_transf_exec(
-						&payout_address,
-						token.as_esdt_identifier(),
-						&amount,
-						&[],
-					);
-
-					Ok(())
-				},
-				None => sc_error!("No payments awaiting payout for token")
+			while match held_amounts.front() { Some((held_until, _)) => held_until >= current_epoch, None => false } {
+				total_payable += held_amounts.pop_front().unwrap().1;
 			}
+
+			self.payable_amount(&token).set(&(&total_payable - &amount));
+
+			let _ = self.send().direct_esdt_via_transf_exec(
+				&payout_address,
+				token.as_esdt_identifier(),
+				&amount,
+				&[],
+			);
+
+			Ok(())
 		}
 	}
 
@@ -95,14 +81,9 @@ pub trait PaymentProcessor {
 
 		require!(amount > BigUint::zero(), "Requested amount must be greater than zero");
 
-		let withdrawal_lock_key = WithdrawalLockKey {
-			authorization_id: authorization_id.clone(),
-			payment_account_address: payment_account_address.clone(),
-		};
+		require!(!self.unsettled_amount(&payment_account_address, &authorization_id).is_empty(), "Already processing payment for this authorization");
 
-		require!(!self.withdrawal_locks().contains_key(&withdrawal_lock_key), "Already processing payment for this authorization");
-
-		self.withdrawal_locks().insert(withdrawal_lock_key, amount.clone());
+		self.unsettled_amount(&payment_account_address, &authorization_id).set(&amount);
 
 		Ok(contract_call!(self, payment_account_address.clone(), PaymentAccountProxy)
 			.requestPayment(authorization_id.clone(), amount.clone())
@@ -114,14 +95,9 @@ pub trait PaymentProcessor {
 	fn settle_payment(&self, payment_account_address: Address, authorization_id: BoxedBytes, amount: BigUint, #[call_result] result: AsyncCallResult<TokenIdentifier>) -> SCResult<()> {
 		match result {
 			AsyncCallResult::Ok(token) => {
-				let withdrawal_lock_key = WithdrawalLockKey {
-					authorization_id: authorization_id,
-					payment_account_address: payment_account_address,
-				};
+				self.unsettled_amount(&payment_account_address, &authorization_id).clear();
 
-				self.withdrawal_locks().remove(&withdrawal_lock_key);
-
-				self.held_amounts().entry(token).or_default().update( |held_amounts_list| held_amounts_list.push_back((self.blockchain().get_block_nonce() + PAYMENT_HOLD_PERIOD, amount)) );
+				self.held_amounts(&token).push_back((self.blockchain().get_block_nonce() + PAYMENT_HOLD_PERIOD, amount));
 
 				Ok(())
 			},
@@ -136,11 +112,12 @@ pub trait PaymentProcessor {
 	fn owner(&self) -> SingleValueMapper<Self::Storage, Address>;
 
 	#[storage_mapper("held_amounts")]
-	fn held_amounts(&self) -> MapStorageMapper<Self::Storage, TokenIdentifier, LinkedListMapper<Self::Storage, (u64, BigUint)>>;
+	fn held_amounts(&self, token: &TokenIdentifier) -> LinkedListMapper<Self::Storage, (u64, BigUint)>;
 
-	#[storage_mapper("payable_amounts")]
-	fn payable_amounts(&self) -> MapMapper<Self::Storage, TokenIdentifier, BigUint>;
+	#[storage_mapper("payable_amount")]
+	fn payable_amount(&self, token: &TokenIdentifier) -> SingleValueMapper<Self::Storage, BigUint>;
 
-	#[storage_mapper("withdrawal_locks")]
-	fn withdrawal_locks(&self) -> MapMapper<Self::Storage, WithdrawalLockKey, BigUint>;
+	#[view(getUnsettledAmount)]
+	#[storage_mapper("unsettled_amount")]
+	fn unsettled_amount(&self, payment_account_address: &Address, authorization_id: &BoxedBytes) -> SingleValueMapper<Self::Storage, BigUint>;
 }

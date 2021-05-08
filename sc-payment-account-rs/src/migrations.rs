@@ -76,7 +76,11 @@ pub trait MigrationsModule {
 
         Ok(contract_call.async_call().with_callback(self.callbacks().send_authorizations(new_contract)))
       },
-      AsyncCallResult::Err(message) => Err(message.err_msg.into())
+      AsyncCallResult::Err(message) => {
+        self.migrating().set(&false);
+
+        Err(message.err_msg.into())
+      }
     }
   }
 
@@ -109,7 +113,11 @@ pub trait MigrationsModule {
 
         Ok(contract_call.async_call().with_callback(self.callbacks().send_every_x_epochs_payments(new_contract)))
       },
-      AsyncCallResult::Err(message) => Err(message.err_msg.into())
+      AsyncCallResult::Err(message) => {
+        self.migrating().set(&false);
+
+        Err(message.err_msg.into())
+      }
     }
   }
 
@@ -140,7 +148,11 @@ pub trait MigrationsModule {
 
         Ok(contract_call.async_call().with_callback(self.callbacks().send_assets_and_end_migration(new_contract)))
       },
-      AsyncCallResult::Err(message) => Err(message.err_msg.into())
+      AsyncCallResult::Err(message) => {
+        self.migrating().set(&false);
+
+        Err(message.err_msg.into())
+      }
     }
   }
 
@@ -159,7 +171,11 @@ pub trait MigrationsModule {
              .async_call()
              .with_callback(self.callbacks().finalize_migration(new_contract)))
       },
-      AsyncCallResult::Err(message) => Err(message.err_msg.into())
+      AsyncCallResult::Err(message) => {
+        self.migrating().set(&false);
+
+        Err(message.err_msg.into())
+      }
     }
   }
 
@@ -173,7 +189,11 @@ pub trait MigrationsModule {
 
         Ok(())
       },
-      AsyncCallResult::Err(message) => Err(message.err_msg.into())
+      AsyncCallResult::Err(message) => {
+        self.migrating().set(&false);
+
+        Err(message.err_msg.into())
+      }
     }
   }
 

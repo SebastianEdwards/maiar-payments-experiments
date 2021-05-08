@@ -1,6 +1,7 @@
 elrond_wasm::imports!();
 elrond_wasm::derive_imports!();
 
+pub use crate::authorizations::*;
 pub use crate::users::*;
 
 #[elrond_wasm_derive::callable(PaymentAccountProxy)]
@@ -12,6 +13,9 @@ pub trait PaymentAccount {
 
 #[elrond_wasm_derive::module(MigrationsModuleImpl)]
 pub trait MigrationsModule {
+  #[module(AuthorizationsModuleImpl)]
+	fn authorizations(&self) -> AuthorizationsModuleImpl<T, BigInt, BigUint>;
+
 	#[module(UsersModuleImpl)]
 	fn users(&self) -> UsersModuleImpl<T, BigInt, BigUint>;
 
@@ -59,12 +63,35 @@ pub trait MigrationsModule {
       let _ = args.push_async_arg(arg_buffer);
     }
 
-    contract_call.async_call().with_callback(self.callbacks().send_end(new_contract))
+    contract_call.async_call().with_callback(self.callbacks().send_authorizations(new_contract))
   }
 
   #[callback]
-  fn send_authorizations(&self, _new_contract: Address) {
-    // TODO: Implement this
+  fn send_authorizations(&self, new_contract: Address) -> AsyncCall<BigUint> {
+    let mut contract_call = ContractCall::<BigUint, ()>::new(
+      new_contract.clone(),
+      TokenIdentifier::egld(),
+      BigUint::zero(),
+      BoxedBytes::from(&b"migrateAuthorizations"[..]),
+    );
+
+    let arg_buffer = contract_call.get_mut_arg_buffer();
+
+    for authorization_id in self.authorizations().authorizations().keys() {
+      let authorization = self.authorizations().authorizations().get(&authorization_id).unwrap();
+
+      let args = MultiArg5::<BoxedBytes, Address, AuthorizedAmount<BigUint>, AuthorizedDebits, TokenIdentifier>::from((
+        authorization_id,
+        authorization.authorized_address,
+        authorization.authorized_amount,
+        authorization.authorized_debits,
+        authorization.token,
+      ));
+
+      let _ = args.push_async_arg(arg_buffer);
+    }
+
+    contract_call.async_call().with_callback(self.callbacks().send_end(new_contract))
   }
 
   #[callback]
@@ -112,7 +139,22 @@ pub trait MigrationsModule {
     user_data.into_vec().into_iter().for_each(|pair| {
       let (address, role) = pair.into_tuple();
 
-      let _ = self.users().add_user(address, role);
+      let _ = self.users().add_user(address, role); // TODO: Interact with storage directly
+    } );
+
+    Ok(())
+  }
+
+  #[endpoint(migrateAuthorizations)]
+  fn migrate_authorizations(&self, #[var_args] authorization_data: VarArgs<MultiArg5<BoxedBytes, Address, AuthorizedAmount<BigUint>, AuthorizedDebits, TokenIdentifier>>) -> SCResult<()> {
+    require!(self.migrating().get(), "Migration not in progress");
+
+    require!(self.blockchain().get_caller() == self.migrated_from().get(), "Must be called from previous contract");
+
+    authorization_data.into_vec().into_iter().for_each(|pair| {
+      let (authorization_id, authorized_address, authorized_amount, authorized_debits, token) = pair.into_tuple();
+
+      let _ = self.authorizations().authorize(authorization_id, authorized_address, authorized_amount, authorized_debits, token); // TODO: Interact with storage directly
     } );
 
     Ok(())

@@ -55,9 +55,9 @@ pub trait AssetsModule {
 	#[inline]
 	fn send_tokens(&self, token: &TokenIdentifier, amount: &BigUint, destination: &Address) {
 		if amount > &0 {
-			let _ = self.send().direct_esdt_via_transf_exec(
+			let _ = self.send().direct(
 				destination,
-				token.as_esdt_identifier(),
+				token,
 				amount,
 				&[],
 			);

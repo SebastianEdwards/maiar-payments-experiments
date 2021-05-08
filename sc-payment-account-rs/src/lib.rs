@@ -14,11 +14,6 @@ pub use crate::authorizations::*;
 pub use crate::migrations::*;
 pub use crate::users::*;
 
-#[elrond_wasm_derive::callable(PaymentProcessorProxy)]
-pub trait PaymentProcessor {
-	fn getUnsettledAmount(&self, authorization_id: BoxedBytes) -> ContractCall<BigUint, BigUint>;
-}
-
 #[elrond_wasm_derive::contract(PaymentAccountImpl)]
 pub trait PaymentAccount {
 	#[module(AssetsModuleImpl)]
@@ -37,7 +32,5 @@ pub trait PaymentAccount {
 	fn init(&self) {
 		let user_id = self.users().user_storage().get_or_create_user(&self.blockchain().get_caller());
 		self.users().set_role_for_user_id(user_id, UserRole::Manager);
-
-		self.migrations().migrated().set(&false);
 	}
 }

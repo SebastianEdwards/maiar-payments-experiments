@@ -34,15 +34,9 @@ pub trait AssetsModule {
 
 		let caller = self.blockchain().get_caller();
 
-		// if (self.cards().len() > 0) {
-		// 	for card in self.cards().values() {
-		// 		// TODO: check for withdrawal lock if active card authorization
-		// 		// TODO: figure out how to maintain state of previous checks inside multiple async callbacks
-		// 	}
-		// }
-
-		// TODO: If one or more withdrawal locks: ensure balance of assets minus locked amounts does not exceed withdrawal requests (factor in margin of error for slippage)
-		// May require oracle price checks? Do calculation at UI layer first to reduce wastage
+		// TODO: Check all withdrawal locks.
+    // Iteration 1: block if any active.
+    // Iteration 2: normalize value of locks and total assets into withdrawal token and ensure total assets minus withdrawal amount doesn't exceed value of locks (factor in margin of error for slippage)
 
     self.send_tokens(&token, &amount, &caller);
 

@@ -4,6 +4,12 @@
 elrond_wasm::imports!();
 elrond_wasm::derive_imports!();
 
+pub mod migrations;
+pub mod users;
+
+pub use crate::migrations::*;
+pub use crate::users::*;
+
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi, Clone, Copy, PartialEq)]
 pub enum AuthorizedAmount<BigUint: BigUintApi> {
 	Fixed(BigUint),
@@ -26,13 +32,6 @@ pub struct PaymentAuthorization<BigUint: BigUintApi> {
   token: TokenIdentifier,
 }
 
-#[derive(TopEncode, TopDecode, TypeAbi, Clone, Copy, PartialEq)]
-pub enum UserRole {
-	None,
-	Manager,
-	SharedAccess,
-}
-
 #[elrond_wasm_derive::callable(PaymentProcessorProxy)]
 pub trait PaymentProcessor {
 	fn getUnsettledAmount(&self, authorization_id: BoxedBytes) -> ContractCall<BigUint, BigUint>;
@@ -40,28 +39,18 @@ pub trait PaymentProcessor {
 
 #[elrond_wasm_derive::contract(PaymentAccountImpl)]
 pub trait PaymentAccount {
+	#[module(MigrationsModuleImpl)]
+	fn migrations(&self) -> MigrationsModuleImpl<T, BigInt, BigUint>;
+
+	#[module(UsersModuleImpl)]
+	fn users(&self) -> UsersModuleImpl<T, BigInt, BigUint>;
+
 	#[init]
-	fn init(&self, initial_address: Address) {
-		let my_address: Address = self.blockchain().get_caller();
-		self.owner().set(&my_address);
+	fn init(&self) {
+		let user_id = self.users().user_storage().get_or_create_user(&self.blockchain().get_caller());
+		self.users().set_role_for_user_id(user_id, UserRole::Manager);
 
-		let user_id = self.users().get_or_create_user(&initial_address);
-		self.set_role_for_user_id(user_id, UserRole::Manager);
-	}
-
-	#[endpoint]
-	fn share(&self, address: Address) -> SCResult<()> {
-		let caller = self.blockchain().get_caller();
-
-		let caller_id = self.users().get_user_id(&caller);
-		require!(self.get_role_for_user_id(caller_id) == UserRole::Manager, "Only manager can share access");
-
-		let user_id = self.users().get_or_create_user(&address);
-		self.set_role_for_user_id(user_id, UserRole::SharedAccess);
-
-		self.user_added_event(&caller, &address);
-
-		Ok(())
+		self.migrations().migrated().set(&false);
 	}
 
   #[payable("*")]
@@ -69,7 +58,9 @@ pub trait PaymentAccount {
 	fn deposit(&self, #[payment] amount: BigUint, #[payment_token] token: TokenIdentifier) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
 
-		require!(self.users().get_user_id(&caller) != 0, "Only user can deposit assets");
+		require!(self.users().current().can_deposit(), "Not allowed to deposit assets");
+
+		self.known_tokens().insert(token.clone());
 
 		self.deposit_made_event(&caller, &token, &amount);
 
@@ -77,32 +68,8 @@ pub trait PaymentAccount {
 	}
 
 	#[endpoint]
-	fn withdraw(&self, amount: BigUint, token: TokenIdentifier) -> SCResult<()> {
-		let caller = self.blockchain().get_caller();
-
-		// if (self.cards().len() > 0) {
-		// 	for card in self.cards().values() {
-		// 		// TODO: check for withdrawal lock if active card authorization
-		// 		// TODO: figure out how to maintain state of previous checks inside multiple async callbacks
-		// 	}
-		// }
-
-		// TODO: If one or more withdrawal locks: ensure balance of assets minus locked amounts does not exceed withdrawal requests (factor in margin of error for slippage)
-		// May require oracle price checks? Do calculation at UI layer first to reduce wastage
-
-		let caller_id = self.users().get_user_id(&caller);
-		require!(self.get_role_for_user_id(caller_id) == UserRole::Manager, "Only manager can withdraw assets");
-
-    self.send_tokens(&token, &amount, &caller);
-
-    Ok(())
-	}
-
-	#[endpoint]
 	fn authorize(&self, authorization_id: BoxedBytes, authorized_address: Address, authorized_amount: AuthorizedAmount<BigUint>, authorized_debits: AuthorizedDebits, token: TokenIdentifier) -> SCResult<()> {
-		let caller = self.blockchain().get_caller();
-
-		require!(self.users().get_user_id(&caller) != 0, "Only user can authorize payments");
+		require!(self.users().current().can_authorize(), "Not allowed to authorize payments");
 
 		let authorization = PaymentAuthorization::<BigUint> {
 			authorized_address: authorized_address,
@@ -122,7 +89,7 @@ pub trait PaymentAccount {
 			Some(authorization) => {
 				let caller = self.blockchain().get_caller();
 
-				require!(self.users().get_user_id(&caller) != 0 || caller == authorization.authorized_address, "Only user or authorized address can cancel authorization");
+				require!(self.users().current().can_authorize() || caller == authorization.authorized_address, "Not allowed to cancel authorization");
 
 				Ok(contract_call!(self, authorization.authorized_address, PaymentProcessorProxy)
 					.getUnsettledAmount(authorization_id.clone())
@@ -242,32 +209,40 @@ pub trait PaymentAccount {
 		}
 	}
 
+	#[endpoint]
+	fn withdraw(&self, amount: BigUint, token: TokenIdentifier) -> SCResult<()> {
+		require!(self.users().current().can_authorize(), "Not allowed to withdraw assets");
+
+		let caller = self.blockchain().get_caller();
+
+		// if (self.cards().len() > 0) {
+		// 	for card in self.cards().values() {
+		// 		// TODO: check for withdrawal lock if active card authorization
+		// 		// TODO: figure out how to maintain state of previous checks inside multiple async callbacks
+		// 	}
+		// }
+
+		// TODO: If one or more withdrawal locks: ensure balance of assets minus locked amounts does not exceed withdrawal requests (factor in margin of error for slippage)
+		// May require oracle price checks? Do calculation at UI layer first to reduce wastage
+
+    self.send_tokens(&token, &amount, &caller);
+
+    Ok(())
+	}
+
 	// events
 
 	#[event("deposit_made")]
 	fn deposit_made_event(&self, #[indexed] depositor: &Address, #[indexed] token: &TokenIdentifier, amount: &BigUint);
 
-	#[event("user_added")]
-	fn user_added_event(&self, #[indexed] manager: &Address, new_user: &Address);
-
 	// storage
-
-	#[view(getOwner)]
-	#[storage_mapper("owner")]
-	fn owner(&self) -> SingleValueMapper<Self::Storage, Address>;
-
-	#[storage_mapper("users")]
-	fn users(&self) -> UserMapper<Self::Storage>;
-
-	#[storage_get("user_role")]
-	fn get_role_for_user_id(&self, user_id: usize) -> UserRole;
-
-	#[storage_set("user_role")]
-	fn set_role_for_user_id(&self, user_id: usize, user_role: UserRole);
 
 	#[storage_mapper("authorizations")]
 	fn authorizations(&self) -> MapMapper<Self::Storage, BoxedBytes, PaymentAuthorization<BigUint>>;
 
 	#[storage_mapper("every_x_epochs_payments")]
 	fn every_x_epochs_payments(&self, authorization_id: &BoxedBytes) -> LinkedListMapper<Self::Storage, (u64, BigUint)>;
+
+	#[storage_mapper("known_tokens")]
+	fn known_tokens(&self) -> SetMapper<Self::Storage, TokenIdentifier>;
 }

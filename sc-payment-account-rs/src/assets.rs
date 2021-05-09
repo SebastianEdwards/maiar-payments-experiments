@@ -30,7 +30,7 @@ pub trait AssetsModule {
 
   #[endpoint]
   fn withdraw(&self, amount: BigUint, token: TokenIdentifier) -> SCResult<()> {
-    require!(self.users().current().can_authorize(), "Not allowed to withdraw assets");
+    require!(self.users().current().can_withdraw(), "Not allowed to withdraw assets");
 
     let caller = self.blockchain().get_caller();
 

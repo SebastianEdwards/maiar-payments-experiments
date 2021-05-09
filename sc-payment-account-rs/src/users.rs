@@ -44,6 +44,15 @@ impl UserRole {
       UserRole::SharedAccess => true,
     }
   }
+
+  #[inline]
+  pub fn can_withdraw(&self) -> bool {
+    match self {
+      UserRole::None => false,
+      UserRole::Manager => true,
+      UserRole::SharedAccess => false,
+    }
+  }
 }
 
 #[elrond_wasm_derive::module(UsersModuleImpl)]

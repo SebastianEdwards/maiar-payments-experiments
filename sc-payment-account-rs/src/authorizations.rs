@@ -3,6 +3,7 @@
 elrond_wasm::imports!();
 elrond_wasm::derive_imports!();
 
+pub use crate::assets::*;
 pub use crate::users::*;
 
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, TypeAbi, Clone, Copy, PartialEq)]
@@ -34,6 +35,9 @@ pub trait PaymentProcessor {
 
 #[elrond_wasm_derive::module(AuthorizationsModuleImpl)]
 pub trait AuthorizationsModule {
+	#[module(AssetsModuleImpl)]
+	fn assets(&self) -> AssetsModuleImpl<T, BigInt, BigUint>;
+
 	#[module(UsersModuleImpl)]
 	fn users(&self) -> UsersModuleImpl<T, BigInt, BigUint>;
 
@@ -122,8 +126,8 @@ pub trait AuthorizationsModule {
 			AuthorizedAmount::Unlimited => require!(true, "Always passes")
 		}
 
-		if &self.get_balance(&authorization.token) >= &amount {
-			self.send_tokens(&authorization.token, &amount, &authorization.authorized_address);
+		if &self.assets().get_balance(&authorization.token) >= &amount {
+			self.assets().send_tokens(&authorization.token, &amount, &authorization.authorized_address);
 		} else {
 			// TODO: Actual conversion of tokens into settlement currency as required or fail
 		}
@@ -156,27 +160,6 @@ pub trait AuthorizationsModule {
 		}
 
 		Ok(authorization.token)
-	}
-
-	#[inline]
-	fn get_balance(&self, token: &TokenIdentifier) -> BigUint {
-		if token == &TokenIdentifier::egld() {
-			self.blockchain().get_balance(&self.blockchain().get_sc_address())
-		} else {
-			self.blockchain().get_esdt_balance(&self.blockchain().get_sc_address(), token.as_esdt_identifier(), 0)
-		}
-	}
-
-	#[inline]
-	fn send_tokens(&self, token: &TokenIdentifier, amount: &BigUint, destination: &Address) {
-		if amount > &0 {
-			let _ = self.send().direct_esdt_via_transf_exec(
-				destination,
-				token.as_esdt_identifier(),
-				amount,
-				&[],
-			);
-		}
 	}
 
 	// storage

@@ -163,6 +163,7 @@ pub trait MigrationsModule {
         for token in self.assets().known_tokens().iter() {
           let balance = self.assets().get_balance(&token);
 
+          // TODO: change this to use migrateAsset endpoint
           self.assets().send_tokens(&token, &balance, &new_contract);
         }
 
@@ -262,6 +263,18 @@ pub trait MigrationsModule {
 
       self.authorizations().every_x_epochs_payments(&authorization_id).push_back((block_epoch, payment_amount));
     } );
+
+    Ok(())
+  }
+
+  #[payable("*")]
+  #[endpoint(migrateAsset)]
+  fn migrate_asset(&self, #[payment_token] token: TokenIdentifier) -> SCResult<()> {
+    require!(self.migrating().get(), "Migration not in progress");
+
+    require!(self.blockchain().get_caller() == self.migrated_from().get(), "Must be called from previous contract");
+
+    self.assets().known_tokens().insert(token.clone());
 
     Ok(())
   }

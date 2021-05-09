@@ -14,21 +14,21 @@ pub trait PaymentAccount {
 #[elrond_wasm_derive::module(MigrationsModuleImpl)]
 pub trait MigrationsModule {
   #[module(AssetsModuleImpl)]
-	fn assets(&self) -> AssetsModuleImpl<T, BigInt, BigUint>;
+  fn assets(&self) -> AssetsModuleImpl<T, BigInt, BigUint>;
 
   #[module(AuthorizationsModuleImpl)]
-	fn authorizations(&self) -> AuthorizationsModuleImpl<T, BigInt, BigUint>;
+  fn authorizations(&self) -> AuthorizationsModuleImpl<T, BigInt, BigUint>;
 
-	#[module(UsersModuleImpl)]
-	fn users(&self) -> UsersModuleImpl<T, BigInt, BigUint>;
+  #[module(UsersModuleImpl)]
+  fn users(&self) -> UsersModuleImpl<T, BigInt, BigUint>;
 
   #[view]
-	fn ready(&self) -> bool { !self.migrating().get() && !self.migrated().get() }
+  fn ready(&self) -> bool { !self.migrating().get() && !self.migrated().get() }
 
   // migration initiator code
 
   #[endpoint]
-	fn migrate(&self, new_code: BoxedBytes) -> SCResult<AsyncCall<BigUint>> {
+  fn migrate(&self, new_code: BoxedBytes) -> SCResult<AsyncCall<BigUint>> {
     require!(self.users().current().can_migrate(), "Not allowed to migrate");
 
     require!(!self.migrating().get(), "Already migrating");
@@ -39,19 +39,19 @@ pub trait MigrationsModule {
 
     self.migrating().set(&true);
 
-		let new_contract = self.send().deploy_contract(
-			self.blockchain().get_gas_left(),
-			&BigUint::zero(),
-			&new_code,
-			CodeMetadata::PAYABLE, // TODO: Stop using payable flag after adding payable asset migration endpoint
-			&ArgBuffer::new(),
-		);
+    let new_contract = self.send().deploy_contract(
+      self.blockchain().get_gas_left(),
+      &BigUint::zero(),
+      &new_code,
+      CodeMetadata::PAYABLE, // TODO: Stop using payable flag after adding payable asset migration endpoint
+      &ArgBuffer::new(),
+    );
 
     Ok(contract_call!(self, new_contract.clone(), PaymentAccountProxy)
       .startMigration()
       .async_call()
-			.with_callback(self.callbacks().send_users(new_contract)))
-	}
+      .with_callback(self.callbacks().send_users(new_contract)))
+  }
 
   #[callback]
   fn send_users(&self, new_contract: Address, #[call_result] result: AsyncCallResult<()>) -> SCResult<AsyncCall<BigUint>> {
@@ -279,16 +279,16 @@ pub trait MigrationsModule {
 
   #[view(migated)]
   #[storage_mapper("migrated")]
-	fn migrated(&self) -> SingleValueMapper<Self::Storage, bool>;
+  fn migrated(&self) -> SingleValueMapper<Self::Storage, bool>;
 
   #[view(migratedFrom)]
-	#[storage_mapper("migrated_from")]
-	fn migrated_from(&self) -> SingleValueMapper<Self::Storage, Address>;
+  #[storage_mapper("migrated_from")]
+  fn migrated_from(&self) -> SingleValueMapper<Self::Storage, Address>;
 
   #[view(migratedTo)]
-	#[storage_mapper("migrated_to")]
-	fn migrated_to(&self) -> SingleValueMapper<Self::Storage, Address>;
+  #[storage_mapper("migrated_to")]
+  fn migrated_to(&self) -> SingleValueMapper<Self::Storage, Address>;
 
   #[storage_mapper("migrating")]
-	fn migrating(&self) -> SingleValueMapper<Self::Storage, bool>;
+  fn migrating(&self) -> SingleValueMapper<Self::Storage, bool>;
 }

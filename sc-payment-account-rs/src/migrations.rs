@@ -7,8 +7,8 @@ pub use crate::users::*;
 
 #[elrond_wasm_derive::callable(PaymentAccountProxy)]
 pub trait PaymentAccount {
-  fn startMigration(&self) -> ContractCall<BigUint, BigUint>;
-  fn endMigration(&self) -> ContractCall<BigUint, BigUint>;
+  fn startMigration(&self) -> ContractCall<BigUint, ()>;
+  fn endMigration(&self) -> ContractCall<BigUint, ()>;
 }
 
 #[elrond_wasm_derive::module(MigrationsModuleImpl)]

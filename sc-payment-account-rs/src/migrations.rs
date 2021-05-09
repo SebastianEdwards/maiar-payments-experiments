@@ -8,6 +8,7 @@ pub use crate::users::*;
 #[elrond_wasm_derive::callable(PaymentAccountProxy)]
 pub trait PaymentAccount {
   fn startMigration(&self) -> ContractCall<BigUint, ()>;
+  fn migrateAsset(&self) -> ContractCall<BigUint, ()>;
   fn endMigration(&self) -> ContractCall<BigUint, ()>;
 }
 
@@ -43,7 +44,7 @@ pub trait MigrationsModule {
       self.blockchain().get_gas_left(),
       &BigUint::zero(),
       &new_code,
-      CodeMetadata::PAYABLE, // TODO: Stop using payable flag after adding payable asset migration endpoint
+      CodeMetadata::DEFAULT,
       &ArgBuffer::new(),
     );
 
@@ -149,7 +150,8 @@ pub trait MigrationsModule {
           }
         }
 
-        Ok(contract_call.async_call().with_callback(self.callbacks().send_assets_and_end_migration(new_contract)))
+        let assets_to_migrate = self.assets().known_tokens().iter().collect();
+        Ok(contract_call.async_call().with_callback(self.callbacks().send_assets_and_end_migration(new_contract, assets_to_migrate)))
       },
       AsyncCallResult::Err(message) => {
         self.migrating().set(&false);
@@ -160,20 +162,32 @@ pub trait MigrationsModule {
   }
 
   #[callback]
-  fn send_assets_and_end_migration(&self, new_contract: Address, #[call_result] result: AsyncCallResult<()>) -> SCResult<AsyncCall<BigUint>> {
+  fn send_assets_and_end_migration(&self, new_contract: Address, remaining_assets: Vec<TokenIdentifier>, #[call_result] result: AsyncCallResult<()>) -> SCResult<AsyncCall<BigUint>> {
     match result {
       AsyncCallResult::Ok(_) => {
-        for token in self.assets().known_tokens().iter() {
-          let balance = self.assets().get_balance(&token);
+        if remaining_assets.len() > 0 {
+          // TODO: Speed this up by not sending assets with zero balances
 
-          // TODO: change this to use migrateAsset endpoint
-          self.assets().send_tokens(&token, &balance, &new_contract);
+          let mut new_remaining_assets = remaining_assets.clone();
+          let asset = new_remaining_assets.pop().unwrap();
+
+          Ok(
+            contract_call!(self, new_contract.clone(), PaymentAccountProxy)
+              .with_token_transfer(asset.clone(), self.assets().get_balance(&asset))
+              .migrateAsset()
+              .async_call()
+              .with_callback(self.callbacks().send_assets_and_end_migration(new_contract, new_remaining_assets)
+            )
+          )
+        } else {
+          Ok(
+            contract_call!(self, new_contract.clone(), PaymentAccountProxy)
+              .endMigration()
+              .async_call()
+              .with_callback(self.callbacks().finalize_migration(new_contract)
+            )
+          )
         }
-
-        Ok(contract_call!(self, new_contract.clone(), PaymentAccountProxy)
-             .endMigration()
-             .async_call()
-             .with_callback(self.callbacks().finalize_migration(new_contract)))
       },
       AsyncCallResult::Err(message) => {
         self.migrating().set(&false);

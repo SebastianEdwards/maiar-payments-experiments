@@ -1,4 +1,4 @@
-WALLET_PEM="${PROJECT}/../testnet/wallets/users/WALLET_PEM.pem"
+WALLET_PEM="${PROJECT}/../testnet/wallets/users/mike.pem"
 ADDRESS=$(erdpy data load --key=address-devnet)
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction-devnet)
 DEPLOY_GAS="80000000"

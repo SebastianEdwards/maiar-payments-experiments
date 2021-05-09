@@ -40,7 +40,7 @@ pub trait PaymentProcessor {
 	}
 
 	#[endpoint]
-	fn payout(&self, payout_address: Address, token: TokenIdentifier, amount: BigUint) -> SCResult<()> {
+	fn payout(&self, payout_address: Address, token: TokenIdentifier, amount: BigUint) -> SCResult<bool> {
 		only_owner!(self, "Only owner may payout");
 
 		require!(amount > BigUint::zero(), "Payout amount must be greater than zero");
@@ -65,15 +65,17 @@ pub trait PaymentProcessor {
 			self.payable_amount(&token).set(&(&total_payable - &amount));
 
 			self.send_tokens(&token, &amount, &payout_address);
+
+			Ok(true)
 		} else {
 			self.payable_amount(&token).set(&total_payable);
 
 			self.staked_amount().set(&(self.staked_amount().get() - BigUint::from(EARLY_PAYOUT_PENALTY)));
 
 			// TODO: Actually send slashed amount somewhere useful like community fund
-		}
 
-		Ok(())
+			Ok(false)
+		}
 	}
 
 	#[endpoint(requestPayment)]

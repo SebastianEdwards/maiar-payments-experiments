@@ -69,9 +69,12 @@ pub trait MigrationsModule {
         for user_id in 1..self.users().user_storage().get_user_count() {
           let address = self.users().user_storage().get_user_address(user_id).unwrap();
           let role = self.users().get_role_for_user_id(user_id);
-          let args = MultiArg2::<Address, UserRole>::from((address, role));
 
-          let _ = args.push_async_arg(arg_buffer);
+          if role != UserRole::None {
+            let args = MultiArg2::<Address, UserRole>::from((address, role));
+
+            let _ = args.push_async_arg(arg_buffer);
+          }
         }
 
         Ok(contract_call.async_call().with_callback(self.callbacks().send_authorizations(new_contract)))

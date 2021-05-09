@@ -25,7 +25,7 @@ checkDeployment() {
 
 deposit() {
   erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${WALLET_PEM} \
-        --gas-limit=1400000000 --value=50000 --function=deposit --send --proxy=${PROXY} --chain=${CHAIN_ID}
+        --gas-limit=31029682 --value=50000 --function=deposit --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
 deployMigrationContract() {
@@ -38,6 +38,10 @@ deployMigrationContract() {
 migrate() {
   erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${WALLET_PEM} \
         --gas-limit=303726800 --function=migrate --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
+getBalance() {
+  erdpy --verbose account get --address ${ADDRESS} --balance --proxy=${PROXY}
 }
 
 migrated() {

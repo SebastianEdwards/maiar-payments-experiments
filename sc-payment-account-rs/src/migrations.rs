@@ -23,16 +23,11 @@ pub trait MigrationsModule {
   #[module(UsersModuleImpl)]
   fn users(&self) -> UsersModuleImpl<T, BigInt, BigUint>;
 
-  #[view]
-  fn ready(&self) -> bool { !self.migrating().get() && !self.migrated().get() }
-
   // migration initiator code
 
   #[endpoint(deployContract)]
   fn deploy_contract(&self, new_code: BoxedBytes) -> SCResult<Address> {
     require!(self.users().current().can_migrate(), "Not allowed to deploy new contract");
-
-    require!(!self.migrating().get(), "Already migrating");
 
     require!(!self.migrated().get(), "Already migrated");
 
@@ -50,184 +45,121 @@ pub trait MigrationsModule {
   }
 
   #[endpoint]
-  fn migrate(&self) -> SCResult<AsyncCall<BigUint>> {
+  fn migrate(&self) -> SCResult<()> {
     require!(self.users().current().can_migrate(), "Not allowed to migrate");
-
-    require!(!self.migrating().get(), "Already migrating");
 
     require!(!self.migrated().get(), "Already migrated");
 
     // TODO: Check unsettled funds
 
     let new_contract = self.migrating_to().get();
-    self.migrating().set(&true);
 
-    Ok(contract_call!(self, new_contract.clone(), PaymentAccountProxy)
+    contract_call!(self, new_contract.clone(), PaymentAccountProxy)
       .startMigration()
-      .async_call()
-      .with_callback(self.callbacks().send_users(new_contract)))
-  }
+      .execute_on_dest_context(self.blockchain().get_gas_left(), self.send());
 
-  #[callback]
-  fn send_users(&self, new_contract: Address, #[call_result] result: AsyncCallResult<()>) -> SCResult<AsyncCall<BigUint>> {
-    match result {
-      AsyncCallResult::Ok(_) => {
-        let mut contract_call = ContractCall::<BigUint, ()>::new(
-          new_contract.clone(),
-          TokenIdentifier::egld(),
-          BigUint::zero(),
-          BoxedBytes::from(&b"migrateUsers"[..]),
-        );
+    self.send_users(new_contract.clone());
+    // TODO: Skip this step if no authorizations
+    self.send_authorizations(new_contract.clone());
+    // TODO: Skip this step if no authorizations with EveryXEpochs authorized amount
+    self.send_every_x_epochs_payments(new_contract.clone());
 
-        let arg_buffer = contract_call.get_mut_arg_buffer();
+    let zero = BigUint::zero();
+    for asset in self.assets().known_tokens().iter() {
+      let balance = self.assets().get_balance(&asset);
 
-        for user_id in 1..self.users().user_storage().get_user_count() {
-          let address = self.users().user_storage().get_user_address(user_id).unwrap();
-          let role = self.users().get_role_for_user_id(user_id);
-
-          if role != UserRole::None {
-            let args = MultiArg2::<Address, UserRole>::from((address, role));
-
-            let _ = args.push_async_arg(arg_buffer);
-          }
-        }
-
-        Ok(contract_call.async_call().with_callback(self.callbacks().send_authorizations(new_contract)))
-      },
-      AsyncCallResult::Err(message) => {
-        self.migrating().set(&false);
-
-        Err(message.err_msg.into())
+      if balance > zero {
+        contract_call!(self, new_contract.clone(), PaymentAccountProxy)
+          .with_token_transfer(asset.clone(), self.assets().get_balance(&asset))
+          .migrateAsset()
+          .execute_on_dest_context(self.blockchain().get_gas_left(), self.send());
       }
     }
+
+    contract_call!(self, new_contract.clone(), PaymentAccountProxy)
+      .endMigration()
+      .execute_on_dest_context(self.blockchain().get_gas_left(), self.send());
+
+    self.migrated().set(&true);
+    self.migrated_to().set(&new_contract);
+
+    Ok(())
   }
 
-  #[callback]
-  fn send_authorizations(&self, new_contract: Address, #[call_result] result: AsyncCallResult<()>) -> SCResult<AsyncCall<BigUint>> {
-    match result {
-      AsyncCallResult::Ok(_) => {
-        let mut contract_call = ContractCall::<BigUint, ()>::new(
-          new_contract.clone(),
-          TokenIdentifier::egld(),
-          BigUint::zero(),
-          BoxedBytes::from(&b"migrateAuthorizations"[..]),
-        );
+  fn send_users(&self, new_contract: Address) {
+    let mut contract_call = ContractCall::<BigUint, ()>::new(
+      new_contract,
+      TokenIdentifier::egld(),
+      BigUint::zero(),
+      BoxedBytes::from(&b"migrateUsers"[..]),
+    );
 
-        let arg_buffer = contract_call.get_mut_arg_buffer();
+    let arg_buffer = contract_call.get_mut_arg_buffer();
 
-        for authorization_id in self.authorizations().authorizations().keys() {
-          let authorization = self.authorizations().authorizations().get(&authorization_id).unwrap();
+    for user_id in 1..self.users().user_storage().get_user_count() {
+      let address = self.users().user_storage().get_user_address(user_id).unwrap();
+      let role = self.users().get_role_for_user_id(user_id);
 
-          let args = MultiArg5::<BoxedBytes, Address, AuthorizedAmount<BigUint>, AuthorizedDebits, TokenIdentifier>::from((
-            authorization_id,
-            authorization.authorized_address,
-            authorization.authorized_amount,
-            authorization.authorized_debits,
-            authorization.token,
-          ));
+      if role != UserRole::None {
+        let args = MultiArg2::<Address, UserRole>::from((address, role));
 
-          let _ = args.push_async_arg(arg_buffer);
-        }
-
-        // TODO: Skip this step if no authorizations with EveryXEpochs authorized amount
-        Ok(contract_call.async_call().with_callback(self.callbacks().send_every_x_epochs_payments(new_contract)))
-      },
-      AsyncCallResult::Err(message) => {
-        self.migrating().set(&false);
-
-        Err(message.err_msg.into())
+        let _ = args.push_async_arg(arg_buffer);
       }
     }
+
+    contract_call.execute_on_dest_context(self.blockchain().get_gas_left(), self.send());
   }
 
-  #[callback]
-  fn send_every_x_epochs_payments(&self, new_contract: Address, #[call_result] result: AsyncCallResult<()>) -> SCResult<AsyncCall<BigUint>> {
-    match result {
-      AsyncCallResult::Ok(_) => {
-        let mut contract_call = ContractCall::<BigUint, ()>::new(
-          new_contract.clone(),
-          TokenIdentifier::egld(),
-          BigUint::zero(),
-          BoxedBytes::from(&b"migrateEveryXEpochsPayments"[..]),
-        );
+  fn send_authorizations(&self, new_contract: Address) {
+    let mut contract_call = ContractCall::<BigUint, ()>::new(
+      new_contract,
+      TokenIdentifier::egld(),
+      BigUint::zero(),
+      BoxedBytes::from(&b"migrateAuthorizations"[..]),
+    );
 
-        let arg_buffer = contract_call.get_mut_arg_buffer();
+    let arg_buffer = contract_call.get_mut_arg_buffer();
 
-        for authorization_id in self.authorizations().authorizations().keys() {
-          for (block_epoch, payment_amount) in self.authorizations().every_x_epochs_payments(&authorization_id).iter() {
-            let args = MultiArg3::<BoxedBytes, u64, BigUint>::from((
-              authorization_id.clone(),
-              block_epoch,
-              payment_amount,
-            ));
+    for authorization_id in self.authorizations().authorizations().keys() {
+      let authorization = self.authorizations().authorizations().get(&authorization_id).unwrap();
 
-            let _ = args.push_async_arg(arg_buffer);
-          }
-        }
+      let args = MultiArg5::<BoxedBytes, Address, AuthorizedAmount<BigUint>, AuthorizedDebits, TokenIdentifier>::from((
+        authorization_id,
+        authorization.authorized_address,
+        authorization.authorized_amount,
+        authorization.authorized_debits,
+        authorization.token,
+      ));
 
-        let assets_to_migrate = self.assets().known_tokens().iter().collect();
-        Ok(contract_call.async_call().with_callback(self.callbacks().send_assets_and_end_migration(new_contract, assets_to_migrate)))
-      },
-      AsyncCallResult::Err(message) => {
-        self.migrating().set(&false);
-
-        Err(message.err_msg.into())
-      }
+      let _ = args.push_async_arg(arg_buffer);
     }
+
+    contract_call.execute_on_dest_context(self.blockchain().get_gas_left(), self.send());
   }
 
-  #[callback]
-  fn send_assets_and_end_migration(&self, new_contract: Address, remaining_assets: Vec<TokenIdentifier>, #[call_result] result: AsyncCallResult<()>) -> SCResult<AsyncCall<BigUint>> {
-    match result {
-      AsyncCallResult::Ok(_) => {
-        if remaining_assets.len() > 0 {
-          // TODO: Speed this up by not sending assets with zero balances
+  fn send_every_x_epochs_payments(&self, new_contract: Address) {
+    let mut contract_call = ContractCall::<BigUint, ()>::new(
+      new_contract.clone(),
+      TokenIdentifier::egld(),
+      BigUint::zero(),
+      BoxedBytes::from(&b"migrateEveryXEpochsPayments"[..]),
+    );
 
-          let mut new_remaining_assets = remaining_assets.clone();
-          let asset = new_remaining_assets.pop().unwrap();
+    let arg_buffer = contract_call.get_mut_arg_buffer();
 
-          Ok(
-            contract_call!(self, new_contract.clone(), PaymentAccountProxy)
-              .with_token_transfer(asset.clone(), self.assets().get_balance(&asset))
-              .migrateAsset()
-              .async_call()
-              .with_callback(self.callbacks().send_assets_and_end_migration(new_contract, new_remaining_assets)
-            )
-          )
-        } else {
-          Ok(
-            contract_call!(self, new_contract.clone(), PaymentAccountProxy)
-              .endMigration()
-              .async_call()
-              .with_callback(self.callbacks().finalize_migration(new_contract)
-            )
-          )
-        }
-      },
-      AsyncCallResult::Err(message) => {
-        self.migrating().set(&false);
+    for authorization_id in self.authorizations().authorizations().keys() {
+      for (block_epoch, payment_amount) in self.authorizations().every_x_epochs_payments(&authorization_id).iter() {
+        let args = MultiArg3::<BoxedBytes, u64, BigUint>::from((
+          authorization_id.clone(),
+          block_epoch,
+          payment_amount,
+        ));
 
-        Err(message.err_msg.into())
+        let _ = args.push_async_arg(arg_buffer);
       }
     }
-  }
 
-  #[callback]
-  fn finalize_migration(&self, new_contract: Address, #[call_result] result: AsyncCallResult<()>) -> SCResult<()> {
-    match result {
-      AsyncCallResult::Ok(_) => {
-        self.migrating().set(&false);
-        self.migrated().set(&true);
-        self.migrated_to().set(&new_contract);
-
-        Ok(())
-      },
-      AsyncCallResult::Err(message) => {
-        self.migrating().set(&false);
-
-        Err(message.err_msg.into())
-      }
-    }
+    contract_call.execute_on_dest_context(self.blockchain().get_gas_left(), self.send());
   }
 
   // migration reciever code

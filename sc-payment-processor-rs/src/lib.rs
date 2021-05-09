@@ -34,6 +34,11 @@ pub trait PaymentProcessor {
 		self.owner().set(&my_address);
 	}
 
+	#[view(getUnsettledAmount)]
+	fn get_unsettled_amount(&self, authorization_id: &BoxedBytes) -> BigUint {
+		self.unsettled_amount(&self.blockchain().get_caller(), &authorization_id).get()
+	}
+
 	#[endpoint]
 	fn payout(&self, payout_address: Address, token: TokenIdentifier, amount: BigUint) -> SCResult<()> {
 		only_owner!(self, "Only owner may payout");
@@ -148,7 +153,6 @@ pub trait PaymentProcessor {
 	#[storage_mapper("staked_amount")]
 	fn staked_amount(&self) -> SingleValueMapper<Self::Storage, BigUint>;
 
-	#[view(getUnsettledAmount)]
 	#[storage_mapper("unsettled_amount")]
 	fn unsettled_amount(&self, payment_account_address: &Address, authorization_id: &BoxedBytes) -> SingleValueMapper<Self::Storage, BigUint>;
 }

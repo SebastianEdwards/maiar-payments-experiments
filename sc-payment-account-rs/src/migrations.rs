@@ -28,17 +28,13 @@ pub trait MigrationsModule {
 
   // migration initiator code
 
-  #[endpoint]
-  fn migrate(&self, new_code: BoxedBytes) -> SCResult<AsyncCall<BigUint>> {
-    require!(self.users().current().can_migrate(), "Not allowed to migrate");
+  #[endpoint(deployContract)]
+  fn deploy_contract(&self, new_code: BoxedBytes) -> SCResult<Address> {
+    require!(self.users().current().can_migrate(), "Not allowed to deploy new contract");
 
     require!(!self.migrating().get(), "Already migrating");
 
     require!(!self.migrated().get(), "Already migrated");
-
-    // TODO: Check unsettled funds
-
-    self.migrating().set(&true);
 
     let new_contract = self.send().deploy_contract(
       self.blockchain().get_gas_left(),
@@ -47,6 +43,24 @@ pub trait MigrationsModule {
       CodeMetadata::DEFAULT,
       &ArgBuffer::new(),
     );
+
+    self.migrating_to().set(&new_contract);
+
+    Ok(new_contract)
+  }
+
+  #[endpoint]
+  fn migrate(&self) -> SCResult<AsyncCall<BigUint>> {
+    require!(self.users().current().can_migrate(), "Not allowed to migrate");
+
+    require!(!self.migrating().get(), "Already migrating");
+
+    require!(!self.migrated().get(), "Already migrated");
+
+    // TODO: Check unsettled funds
+
+    let new_contract = self.migrating_to().get();
+    self.migrating().set(&true);
 
     Ok(contract_call!(self, new_contract.clone(), PaymentAccountProxy)
       .startMigration()
@@ -324,4 +338,7 @@ pub trait MigrationsModule {
 
   #[storage_mapper("migrating")]
   fn migrating(&self) -> SingleValueMapper<Self::Storage, bool>;
+
+  #[storage_mapper("migrating_to")]
+  fn migrating_to(&self) -> SingleValueMapper<Self::Storage, Address>;
 }

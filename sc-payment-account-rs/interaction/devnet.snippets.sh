@@ -26,13 +26,18 @@ deposit() {
         --gas-limit=1400000000 --value=50000 --function=deposit --send
 }
 
-migrate() {
+deployMigrationContract() {
   CODE_HEX="0x$(xxd -p ./output/payment_account.wasm | tr -d '\n')"
 
   erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${WALLET_PEM} \
-        --gas-limit=303726800 --arguments ${CODE_HEX} --function=migrate --send
+        --gas-limit=303726800 --arguments ${CODE_HEX} --function=deployContract --send
+}
+
+migrate() {
+  erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${WALLET_PEM} \
+        --gas-limit=1400000000 --function=migrate --send
 }
 
 migrated() {
-  erdpy --verbose contract query ${ADDRESS} --function=migratedTo
+  erdpy --verbose contract query ${ADDRESS} --function=migrating
 }

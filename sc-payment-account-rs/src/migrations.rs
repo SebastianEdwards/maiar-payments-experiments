@@ -43,7 +43,7 @@ pub trait MigrationsModule {
 			self.blockchain().get_gas_left(),
 			&BigUint::zero(),
 			&new_code,
-			CodeMetadata::DEFAULT,
+			CodeMetadata::PAYABLE, // TODO: Stop using payable flag after adding payable asset migration endpoint
 			&ArgBuffer::new(),
 		);
 

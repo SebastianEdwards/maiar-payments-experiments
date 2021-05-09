@@ -214,6 +214,9 @@ pub trait MigrationsModule {
 
     self.migrated_from().set(&caller);
 
+    let user_id = self.users().user_storage().get_or_create_user(&caller);
+    self.users().set_role_for_user_id(user_id, UserRole::None);
+
     Ok(())
   }
 

@@ -129,6 +129,7 @@ pub trait MigrationsModule {
           let _ = args.push_async_arg(arg_buffer);
         }
 
+        // TODO: Skip this step if no authorizations with EveryXEpochs authorized amount
         Ok(contract_call.async_call().with_callback(self.callbacks().send_every_x_epochs_payments(new_contract)))
       },
       AsyncCallResult::Err(message) => {
@@ -245,14 +246,18 @@ pub trait MigrationsModule {
     let user_id = self.users().user_storage().get_or_create_user(&caller);
     self.users().set_role_for_user_id(user_id, UserRole::None);
 
+    self.migration_started_event(&caller);
+
     Ok(())
   }
 
   #[endpoint(migrateUsers)]
   fn migrate_users(&self, #[var_args] user_data: VarArgs<MultiArg2<Address, UserRole>>) -> SCResult<()> {
+    let caller = self.blockchain().get_caller();
+
     require!(self.migrating().get(), "Migration not in progress");
 
-    require!(self.blockchain().get_caller() == self.migrated_from().get(), "Must be called from previous contract");
+    require!(caller == self.migrated_from().get(), "Must be called from previous contract");
 
     user_data.into_vec().into_iter().for_each(|var_args| {
       let (address, role) = var_args.into_tuple();
@@ -260,6 +265,8 @@ pub trait MigrationsModule {
       let user_id = self.users().user_storage().get_or_create_user(&address);
       self.users().set_role_for_user_id(user_id, role);
     } );
+
+    self.users_migrated_event(&caller);
 
     Ok(())
   }
@@ -322,6 +329,14 @@ pub trait MigrationsModule {
     Ok(())
   }
 
+  // events
+
+  #[event("migration_started")]
+  fn migration_started_event(&self, from: &Address);
+
+  #[event("users_migrated")]
+  fn users_migrated_event(&self, from: &Address);
+
   // storage
 
   #[view(migated)]
@@ -336,6 +351,7 @@ pub trait MigrationsModule {
   #[storage_mapper("migrated_to")]
   fn migrated_to(&self) -> SingleValueMapper<Self::Storage, Address>;
 
+  #[view(migrating)]
   #[storage_mapper("migrating")]
   fn migrating(&self) -> SingleValueMapper<Self::Storage, bool>;
 

@@ -27,7 +27,9 @@ The payment account is the primary method through which end-users (payers) will 
 To allow payments from a payment processor a user must first allow that action by authorizing the payment. Authorizations may be given for one or multiple debits and for fixed or varying amounts. 3 examples of typical authorizations:
 
 **a) Buying a coffee:** allow one debit with a set maximum fixed amount
+
 **b) Subscribing to a weekly newsletter:** allow unlimited debits but no more than X per week (periods measured in rounds)
+
 **c) Authorizing a debit card issuer:** unlimited debits but with a max payment amount per transaction
 
 A user may have multiple payment accounts if needed. Payment account managers may also choose to “share” access to a payment account, for example, with family members or business associates.

@@ -178,8 +178,6 @@ pub trait MigrationsModule {
     let user_id = self.users().user_storage().get_or_create_user(&caller);
     self.users().set_role_for_user_id(user_id, UserRole::None);
 
-    self.migration_started_event(&caller);
-
     Ok(())
   }
 
@@ -197,8 +195,6 @@ pub trait MigrationsModule {
       let user_id = self.users().user_storage().get_or_create_user(&address);
       self.users().set_role_for_user_id(user_id, role);
     } );
-
-    self.users_migrated_event(&caller);
 
     Ok(())
   }
@@ -260,14 +256,6 @@ pub trait MigrationsModule {
 
     Ok(())
   }
-
-  // events
-
-  #[event("migration_started")]
-  fn migration_started_event(&self, from: &Address);
-
-  #[event("users_migrated")]
-  fn users_migrated_event(&self, from: &Address);
 
   // storage
 

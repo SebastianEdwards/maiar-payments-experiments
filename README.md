@@ -37,7 +37,7 @@ A user may have multiple payment accounts if needed. Payment account managers ma
 ##### Payment processor
 The payment processor account is a brokering contract deployed by a third-party to collect payment on behalf or businesses/vendors from authorized payment accounts for a given authorization ID. This third-party payment processor can then payout these businesses either on or off-chain. The ability for fast settlement (faster than block finality) is achieved through withdrawal locking (similar to a “hold” on a credit card), this is explained in more detail in the “brokering trust” section.
 
-To help protect user privacy (particularly time-sensitive, geographical data broadcasts; IE I am at X cafe right now purchasing a coffee) - a minimum time period is added to any received funds within which these cannot be paid out. To ensure processors do not broadcast any data which My could link the payer to the eventual payee to the blockchain too quickly, this is enforced by means of contract staking and slashing.
+To help protect user privacy (particularly time-sensitive, geographical data broadcasts; I.E. I am at X cafe right now purchasing a coffee) - a minimum time period is added to any received funds within which these cannot be paid out. A means of staking and slashing is implemented to ensure processors do not broadcast any data, which could link the payer to the payee, to the blockchain too quickly.
 
 #### Brokering trust between contracts to enable fast finality
 

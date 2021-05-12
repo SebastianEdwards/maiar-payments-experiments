@@ -25,10 +25,8 @@
         "from": "address:my_address",
         "contractCode": "file:../output/payment_account.wasm",
         "value": "0",
-        "arguments": [
-          "address:my_address"
-        ],
-        "gasLimit": "1,000,000",
+        "arguments": [ ],
+        "gasLimit": "80,000,000",
         "gasPrice": "0"
       },
       "expect": {
@@ -49,7 +47,10 @@
           "nonce": "0",
           "balance": "0",
           "storage": {
-            "''owner": "address:my_address"
+            "''users_count": "1",
+            "''users_address_to_id|address:my_address": "1",
+            "``users_id_to_address|u32:1": "address:my_address",
+            "``user_role|u32:1": "1"
           },
           "code": "file:../output/payment_account.wasm"
         }

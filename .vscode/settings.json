@@ -16,6 +16,5 @@
     "workbench.dialogs.customEnabled": true,
     "rust-client.rustupPath": "${env:HOME}/elrondsdk/vendor-rust/bin/rustup",
     "rust-client.rlsPath": "${env:HOME}/elrondsdk/vendor-rust/bin/rls",
-    "rust-client.disableRustup": true,
-    "rust-client.autoStartRls": false
+    "rust-client.disableRustup": true
 }

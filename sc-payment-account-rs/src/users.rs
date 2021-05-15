@@ -55,7 +55,7 @@ impl UserRole {
   }
 }
 
-#[elrond_wasm_derive::module(UsersModuleImpl)]
+#[elrond_wasm_derive::module]
 pub trait UsersModule {
   #[endpoint(addUser)]
   fn add_user(&self, address: Address, role: UserRole) -> SCResult<()> {
@@ -82,6 +82,7 @@ pub trait UsersModule {
 
   // storage
 
+  #[view]
   #[storage_get("user_role")]
   fn get_role_for_user_id(&self, user_id: usize) -> UserRole;
 

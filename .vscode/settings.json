@@ -16,5 +16,7 @@
     "workbench.dialogs.customEnabled": true,
     "rust-client.rustupPath": "${env:HOME}/elrondsdk/vendor-rust/bin/rustup",
     "rust-client.rlsPath": "${env:HOME}/elrondsdk/vendor-rust/bin/rls",
-    "rust-client.disableRustup": true
+    "rust-client.disableRustup": true,
+    "rust.build_lib": true,
+    "rust.build_bin": "mpq"
 }

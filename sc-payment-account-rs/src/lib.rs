@@ -100,7 +100,7 @@ pub trait PaymentAccount:
   fn deposit(&self, #[payment] amount: Self::BigUint, #[payment_token] token: TokenIdentifier) -> SCResult<()> {
     let caller = self.blockchain().get_caller();
 
-    // require!(self.users().current().can_deposit(), "Not allowed to deposit assets");
+    require!(self.current().can_deposit(), "Not allowed to deposit assets");
 
     self.known_tokens().insert(token.clone());
 

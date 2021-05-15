@@ -193,8 +193,8 @@ pub trait PaymentAccount:
 
       if balance > zero {
         self.payment_account_proxy_v0(new_contract.clone())
-          .with_token_transfer(asset.clone(), self.get_balance(&asset))
-          .migrate_asset(asset.clone())
+          .migrate_asset(asset.clone(), balance.clone())
+          .with_token_transfer(asset.clone(), balance)
           .execute_on_dest_context(self.blockchain().get_gas_left());
       }
     }
@@ -285,7 +285,7 @@ pub trait PaymentAccount:
 
   #[payable("*")]
   #[endpoint(migrateAsset)]
-  fn migrate_asset(&self, #[payment_token] token: TokenIdentifier) -> SCResult<()> {
+  fn migrate_asset(&self, #[payment_token] token: TokenIdentifier, #[payment] _payment: Self::BigUint) -> SCResult<()> {
     require!(self.migrating().get(), "Migration not in progress");
 
     require!(self.blockchain().get_caller() == self.migrated_from().get(), "Must be called from previous contract");
